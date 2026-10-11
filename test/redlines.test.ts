@@ -1245,7 +1245,8 @@ describe('文档链接', () => {
  * 三条红线一条都没响，靠人眼看行数才发现。标题是这类损坏最廉价、最稳定的指纹。
  *
  * 标题口径按命名策略：子目录文档用 `# <目录>/ — <职责>` 或主题名；
- * 根文档用裸项目名（门面允许 HTML 居中 h1，所以根 README 的标题在第 6 行）。
+ * 根文档用裸项目名（门面允许 HTML 居中 h1，所以根 README 的标题是首屏里的 `<h1 align="center">`，
+ * 不在 Markdown 标题位置上，判据取前 8 行）。
  */
 describe('核心活文档的首行标题', () => {
   /** 首行即标题：`# <对象> — <一句话说明>`。 */
@@ -1265,10 +1266,62 @@ describe('核心活文档的首行标题', () => {
   }
 
   it('根 README 的标题仍是裸项目名（门面用 HTML 居中 h1）', () => {
-    // 门面首屏是展示层：`<p align="center">` + `<h1 align="center">项目名</h1>`。
+    // 门面首屏是展示层：图标 `<p align="center">` + `<h1 align="center">项目名</h1>`。
+    // **h1 不套在 `<p>` 里**：HTML 的 `<p>` 只允许短语内容，`<h1>` 是流内容，
+    // 套起来解析器会在 `<h1>` 前自动闭合 `<p>`，留下两个空段落（无效嵌套）。
     // 标题文字本身仍须符合「裸项目名」，不因居中而变形。
     const head = readFileSync('README.md', 'utf8').split('\n').slice(0, 8).join('\n')
     expect(head).toContain('<h1 align="center">dsh-ds-balance</h1>')
+    // 反向控制 + 无效嵌套守卫：`<p>` 里放 `<h1>` 会被解析器自动闭合，留下两个空段落。
+    // 两份门面都必须裸写 h1（首屏三段：图标 / 标题 / 徽章与语言）。
+    const wrappedInParagraph = (source: string): boolean => /<p[^>]*>\s*<h1/.test(source)
+    expect(wrappedInParagraph(head), 'h1 被套进了 <p>（HTML 不允许，会解析出空段落）').toBe(false)
+    expect(wrappedInParagraph('<p align="center">\n  <h1 align="center">x</h1>\n</p>')).toBe(true)
+  })
+
+  /**
+   * 门面双件的**结构**对齐。
+   *
+   * 「逐条对齐」以前只写在散文里（根 AGENTS.md 的「改根 README 必同改 README_en」），
+   * 于是英文那份漂过两次都没人发现：一次是安装节里多出整段 compat 巡检、
+   * 一次是 h1 被套进 `<p>`（无效嵌套，只有中文那份裸写着）。文字可以各说各的语言，
+   * **节序、表块、图序必须同形** —— 那是「逐条对齐」这句话的可执行判据。
+   */
+  it('两份门面的结构逐条对齐（节序 / 表块 / 图序）', () => {
+    /** 只取骨架、不取文案：标题层级、表行、图、代码围栏、引用块、步骤与 bullet。 */
+    const shape = (file: string): string[] =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .flatMap((line): string[] => {
+          const heading = /^(#{2,3}) /.exec(line)
+          if (heading !== null) return [`heading:${heading[1] ?? ''}`]
+          if (line.startsWith('|')) return [line.includes('---') ? 'table:rule' : 'table:row']
+          const image = /^\s*<img src="(assets\/[^"]+)"/.exec(line)
+          if (image !== null) return [`image:${image[1]?.replace(/_en(?=\.)/, '') ?? ''}`]
+          if (/^\s*```/.test(line)) return ['fence']
+          if (line.startsWith('> ')) return ['quote']
+          if (/^\d+\. /.test(line)) return ['step']
+          if (line.startsWith('- ')) return ['bullet']
+          return []
+        })
+
+    const zh = shape('README.md')
+    // 反向控制：结构指纹必须真的看到了东西，否则下面那条是空转的假绿。
+    expect(zh.length, '结构指纹的长度').toBeGreaterThan(30)
+    // **图片必须在指纹里**：图行是缩进过的（`  <img …`），锚定 `^<img` 会让它一条都取不到 ——
+    // 那样「图序对齐」这句就是空话。这条同时是那条正则的行锚定控制。
+    expect(
+      zh.filter((item) => item.startsWith('image:')),
+      '结构指纹里必须取到三张门面图（去掉 `_en` 后缀后两侧同名）',
+    ).toEqual([
+      'image:assets/sidebar-popover.png',
+      'image:assets/settings-cards-position.png',
+      'image:assets/settings-card.png',
+    ])
+    expect(shape('README_en.md'), '英文门面的节序 / 表块 / 图序必须与中文逐条对齐').toEqual(zh)
+    // 反向控制：删掉一节，指纹必须变得不相等。
+    const withoutConfig = shape('README.md').filter((item) => item !== 'bullet')
+    expect(withoutConfig).not.toEqual(zh)
   })
 
   it('判据本身有牙齿（被覆盖的标题必须被抓出来）', () => {
