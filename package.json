@@ -15,12 +15,12 @@
   "author": "zlZayn",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zlZayn/dsh-ds-balance.git"
+    "url": "git+https://github.com/dsh-plugin-lab/dsh-ds-balance.git"
   },
   "bugs": {
-    "url": "https://github.com/zlZayn/dsh-ds-balance/issues"
+    "url": "https://github.com/dsh-plugin-lab/dsh-ds-balance/issues"
   },
-  "homepage": "https://github.com/zlZayn/dsh-ds-balance#readme",
+  "homepage": "https://github.com/dsh-plugin-lab/dsh-ds-balance#readme",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
