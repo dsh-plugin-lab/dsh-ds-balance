@@ -236,7 +236,8 @@
   「该槽由哪一版 dsh 引入」是**历史事实**，不随下限改；会漂的下限只写 [package.json](package.json) 指针，含版本的那一行必须与 `package.json` 同行（红线在 [test/redlines.test.ts](test/redlines.test.ts)）。过期判据就是这条命令本身。
 - **能落成校验的不写散文**：红线 → [test/redlines.test.ts](test/redlines.test.ts)；发布态不变量 → [scripts/check-release.mjs](scripts/check-release.mjs)；**锁文件的 `resolved` 必须指向官方源 → 红线的「锁文件」组**（此前这条只写在另一仓的发布手册里，所以没人执行）；文档链接与换行 → **本仓暂无独立脚本**（`check-links.py` / `check-line-endings.py` 在本仓并不存在，此前是过期指针），改动后自做一次相对链接与锚点检查，再加 `git diff --check`；把它们做成脚本是待办。
 - **改一处要查得到同步点**：每个子目录 `README.md` 的「变更影响路由」是同步清单入口；新增或改名文件后必须回填。
-- **改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)**：能力清单、上手步骤、指针逐条对齐，冲突以中文为准。
+- **改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)**：节序、表块、图序、上手步骤与指针逐条对齐（**结构对齐由红线可执行**：`test/redlines.test.ts` 的「两份门面的结构逐条对齐」按节序 / 表行 / 图序取指纹比对，文案差异不算），冲突以中文为准。
+  首屏的 `<h1>` **裸写、不套 `<p>`**：`<p>` 只允许短语内容，套起来解析器会自动闭合它、留下空段落（同一组红线守着）。
 - **坑按作用域分流**：只在某个子目录才会踩的坑写进该目录的 `AGENTS.md`（进入即自动注入），本文件只留跨模块、致命的那几条。
 
 ## 文档地图

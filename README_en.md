@@ -2,9 +2,7 @@
   <img src="icon.svg" alt="dsh-ds-balance" width="80" height="80">
 </p>
 
-<p align="center">
-  <h1 align="center">dsh-ds-balance</h1>
-</p>
+<h1 align="center">dsh-ds-balance</h1>
 
 <div align="center">
   <p><strong>DeepSeek account balance in the DSH sidebar</strong></p>
@@ -12,7 +10,7 @@
 
   <p>
     <a href="https://api-docs.deepseek.com/"><img src="https://img.shields.io/badge/DeepSeek%20API-Official-4D6BFE?style=flat" alt="DeepSeek official API"></a>
-    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4176E6?style=flat" alt="DeepSeek Harness Plugin"></a>
+    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4176E6?style=flat" alt="DeepSeek Harness plugin"></a>
   </p>
 
   <p>
@@ -28,203 +26,110 @@
 
 ---
 
-> [!NOTE]
-> **The balance is read from the official DeepSeek API** — not estimated. The credential is resolved only through DSH's credential channel: the API key never lands in a settings file and is never returned to the UI.
+A status ring is pinned to the bottom of the sidebar; clicking it shows the actual balance figures. To change settings, open the **Plugins** page in the sidebar and pick this plugin.
 
-The balance needs somewhere to live that does not take up room. A permanent status ring at the bottom of the sidebar; click it for the three amounts and the freshness of the data. Anything you want to configure lives on the plugin's details page under **Plugins → Installed**.
+## Data and credentials
+
+The balance is read directly from the official DeepSeek API, not estimated from usage.
+
+- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file and is never returned to the UI.
+- The configuration endpoint answers with only a fixed-length mask for the key, not even its last characters; a key is never logged and never written to any file of this plugin.
+- Only `api.deepseek.com` is contacted; no other traffic is proxied or forwarded.
+- Balance snapshots are stored per credential — **changing the key starts keeping records afresh**, so old figures are never mixed in.
+
+## Getting started
+
+**Prerequisites**: DSH on its current RC line (specify `@next` when installing); Node `>= 20`. The only source for the compatible range is `engines.dsh` in [package.json](package.json).
+
+1. Install the host. Neither `latest` nor `alpha` is the line we declare, so specify the version line:
+
+    ```bash
+    npm install -g @deepseek-ai/dsh@next
+    ```
+
+2. Install the plugin:
+
+    ```bash
+    dsh plugin --profile web add dsh-ds-balance
+    ```
+
+3. Start (or restart) `dsh --profile web`; the balance entry appears at the bottom of the sidebar.
+
+From source: `git clone`, then `npm install && npm run build`, then `dsh plugin --profile web add "$PWD"` — the same restart applies.
+That `npm install` cannot be skipped: under a path install the repository supplies its own dependencies, and missing them makes the plugin show as "not running".
+
+## What it shows
+
+Three surfaces, each with one job:
+
+| Surface | Where | What it does |
+|---|---|---|
+| Status ring | Pinned to the bottom of the sidebar | See at a glance how much is left and how close you are to the warning threshold |
+| Balance popover | Click to expand | See the total, the granted / topped-up split, and how many minutes old the data is |
+| Settings card | This plugin's details page under Plugins | Change the endpoint, the currency, the warning thresholds, the refresh cadence |
 
 <p align="center">
-  <img src="assets/sidebar-popover_en.png" alt="The DeepSeek balance entry at the bottom of the sidebar, with its popover open" width="360">
+  <img src="assets/sidebar-popover_en.png" alt="The DeepSeek Balance entry at the bottom of the sidebar, with the balance popover expanded" width="360">
   <br>
-  <em>A permanent fixture at the <strong>bottom of the sidebar</strong>, alongside Usage statistics and Settings; click it for the balance, the granted / topped-up split, and how fresh the data is.</em>
+  <em>The entry is pinned to the bottom of the sidebar; clicking it opens the balance popover: the total, the granted / topped-up split, how many minutes ago the data was, and manual refresh at the bottom right.</em>
 </p>
 
-## The ring at a glance
+The ring itself is "what is going on right now", five states you can tell apart at a glance:
 
-That ring is "what is going on right now" — five shapes, each with a different thing for you to do:
-
-| What you see | Meaning | What you do |
+| The ring | Meaning | What you do |
 |---|---|---|
-| Coloured ring + an arc | There is a balance; the colour is how much | **Read the number** |
-| Grey ring + a gap rotating | Fetching; no answer yet | **Wait** |
-| Grey ring + a **+** in the middle | Nothing connected | **Configure** (an API key, or sign in) |
-| Grey, empty ring | Connected, the account simply has no balance | **Nothing** |
-| Red ring + a **×** in the middle | No usable number here | **Wait, investigate, or check the account** |
+| Coloured ring + an arc | There is a balance; the colour says more or less | Read the number |
+| Grey ring + a rotating gap | Fetching, no result yet | Wait |
+| Grey ring + a **+** in the middle | Not connected to your account yet | Configure it |
+| Grey, empty ring | Connected to your account, which simply has no balance | Nothing |
+| Red ring + a **cross** in the middle | No usable number here | Check it |
 
-**Hover it and it tells you what this spot means right now** (the same sentence whether you hover the
-56px rail ring or the expanded entry with its label):
+## What each thing is
 
-- **When the number is trustworthy** (normal / low / critical) — it shows the **amount**;
-- **otherwise** — it shows that situation's own line: "Loading", "Balance unavailable",
-  "Service error", "No credential configured", "Account unavailable", "Data is stale", "No balance".
-
-**A suspended account and stale data hold a number too, and still do not show it**:
-a suspended account or an expired snapshot reporting a figure only misleads ("I have ¥0" /
-"I have ¥110"). The ring already draws the problem (red cross / old colour); hovering explains it.
-
-The two kinds of "nothing to show" are told apart as well: **not connected** asks you to configure
-a credential; **connected but unreadable** says "Balance unavailable".
-It deliberately does **not** say "temporarily" — some causes clear up on their own, others need you
-to fix a credential, and "temporarily" would send the second group away to wait for nothing.
-The **×** covers both "could not read it" and "read it, but this account cannot be used" —
-both mean "no usable number here", and both send you to investigate.
-
-## Surface at a glance
-
-| Surface | One line | Use it for |
-|---|---|---|
-| Sidebar ring | A status ring plus label at the bottom of the sidebar; **hovering it (in either state) says what this spot means** — the amount when the number is trustworthy, otherwise the situation's own line; and **how full it is = how far the balance is from that currency's warning line** | Seeing at a glance how much is left and how close it is to the warning line |
-| Balance popover | Click the entry: total, granted / topped-up split, data freshness, manual refresh (with cooldown); **an icon at its top right opens this plugin's configuration page** (on a host that does not support it, it falls back to the Plugins list and its tooltip says so) | Checking the exact figures, and how many minutes old they are |
-| Settings card | Connection / Display / Thresholds / Refresh, **all collapsed by default**, expand a group from its header | Changing the endpoint, the currency, the warning lines, the cadence |
-
-The division of labour is fixed: **the ring answers "roughly how much is left", the popover answers "exactly how much", and the card answers "how is that computed".**
-
-<p align="center">
-  <img src="assets/settings-card_en.png" alt="The DeepSeek balance card on the Plugins page" width="360">
-  <br>
-  <em>The card is those four groups: all collapsed by default, expanded one header at a time; a group holding a bad value opens itself.</em>
-</p>
-
-## Capabilities
-
-- A permanent status ring plus label at the bottom of the sidebar; click it for the breakdown. The collapsed and expanded states share the same ring, in the same place.
-- The balance refreshes on its own schedule and the UI reads a cache — leaving the interface open does not hammer the upstream.
-- The popover shows the total, the granted / topped-up split, how old the data is, and a manual refresh with a cooldown; its title line (whale icon + "DeepSeek balance") is itself a link that opens the [official usage page](https://platform.deepseek.com/usage) in a new tab.
-- Multiple currencies: the account decides which currency is shown; when the one chosen in settings is absent, the popover explains and offers "switch to the shown currency" — **that writes straight into settings**, and the settings field follows; the button is disabled when the Host is not writable.
-- The settings card has four groups, **all collapsed by default**, expanded one header at a time; a group holding a bad value opens itself.
-- The credential is inherited from the official model settings by default, so there is nothing to re-enter; where it comes from is on a badge
-  (a key is configured / no key is configured, exactly the official card's wording), and a read-only field explains itself instead of offering an edit.
-- Colour carries state only (normal / low / critical), never an amount; see "[Reading the ring](#reading-the-ring)".
-- It appears on the Plugins page under a **localized name**: "DeepSeek Balance" in English, "DeepSeek 余额" in Chinese —
-  the card and the details page follow the interface language, and the icon is the same ring as the sidebar one
-  (an orange arc reading "seven tenths used"); the details page still spells out the package name `dsh-ds-balance`.
-
-## Installation
-
-### Requirements
-
-- **DSH**: the range lives in `engines.dsh` in [package.json](package.json) — the single source of truth, character-for-character identical to every `@deepseek-ai/dsh-*` entry. This plugin follows the host's current **RC line** (the dist-tag is `next`). The declared surface commits to **two** prerelease families (the RC family and the still-usable older one, enumerated with `||` — npm only matches prereleases within the same `major.minor.patch`, so a single range cannot cover two families); the exact value drifts, so look it up rather than trusting this file.
-- **Node**: `>= 20` (declared in the same place).
-
-Install the host by **naming the version line explicitly**: neither `alpha` nor `latest` of `@deepseek-ai/dsh` is the line we declare — a default install lands outside the declared range.
-
-```bash
-npm install -g @deepseek-ai/dsh@next      # the line this plugin promises to support (the RC line; there is no `rc` tag on npm)
-```
-
-Compatibility is measured, not inferred: every week [compat.yml](.github/workflows/compat.yml) swaps packages onto the `next` (RC) line and reruns the existing tests, and one separate job judges whether the declared ranges still cover the line; a red patrol opens or updates a tracking issue with a fixed title. The current verdict, and what to do when it goes red, are in [Compatibility](docs/PUBLISHING.md#兼容性); the Host-version watershed is in [Version compatibility](#version-compatibility).
-
-### From npm
-
-```bash
-dsh plugin --profile web add dsh-ds-balance
-```
-
-**Restarting `dsh --profile web`** is what makes it take effect.
-
-### From source
-
-```bash
-git clone https://github.com/zlZayn/dsh-ds-balance.git
-cd dsh-ds-balance
-npm install && npm run build
-
-dsh plugin --profile web add "$PWD"
-```
-
-Same as the npm route: it takes effect after a restart.
-
-⚠️ The `npm install` above is not optional: under the `link:` form the repository supplies its
-own dependencies (see [AGENTS.md](AGENTS.md)) — skip it and the plugin shows as "not running"
-(`ERR_MODULE_NOT_FOUND`).
-
-### Discovery
-
-- **npm**: [`dsh-ds-balance`](https://www.npmjs.com/package/dsh-ds-balance)
-- **GitHub**: [`zlZayn/dsh-ds-balance`](https://github.com/zlZayn/dsh-ds-balance)
-
-The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin), which is how the plugin marketplace discovers plugins.
-
-## Version compatibility
-
-- **Which Host version is required**: whatever [package.json](package.json) declares; this plugin follows the host's current **RC line**.
-  To get the configuration page, upgrade the Host to that version or higher: `npm install -g @deepseek-ai/dsh@next`.
-- **The declaration is narrow**: the floor is the version we actually tested, written as `>=` with **no ceiling** —
-  it claims no "everything in the future counts".
-  (It does cover later prereleases **within the same `major.minor.patch`**; once the host moves a patch position and
-  ships another prerelease, this floor no longer covers it and has to be raised again. Why: [Compatibility](docs/PUBLISHING.md#兼容性).)
-- **Why the floor moved**: not a change of where the UI lives, but a change of the **settings seam**
-  (without the two things this plugin relies on, the whole client half never renders — the ring and the popover go with it).
-  The plugin never reads a Host version; it **probes that capability live**, and when it is absent the popover carries
-  one extra English line saying why the configuration page is unavailable and where to upgrade.
-  Technical detail: see [Architecture](docs/ARCHITECTURE.md).
-- **Compatibility is not inferred**: a weekly [compat.yml](.github/workflows/compat.yml) run swaps packages on both the
-  `alpha` and `next` lines and re-runs the existing tests, plus a separate check that the declared range still covers the
-  tracked line; a failure opens or updates a tracking issue with a fixed title. Current conclusions and what to do when
-  it goes red: see [Compatibility](docs/PUBLISHING.md#兼容性).
+| Thing | What it means |
+|---|---|
+| Arc length | The balance as a share of that currency's **warning threshold**, capped at a full circle |
+| Colour | State only (normal / low / critical), never the amount; the **critical threshold only sets the colour** and takes no part in drawing the ring |
+| The mark in the middle | **+** means not connected yet; go configure; **cross** means no usable number here — it could not be read, or it was read but the account cannot be used |
+| Hover text | The **amount** when the number is trustworthy, that state's own line otherwise; collapsed and expanded say the same sentence |
+| The source bracket | `(API key)` / `(account sign-in)` to the right of the popover title marks where this number came from; whichever is shown is the one refreshed |
+| Data freshness | The "how long ago" in the popover, counted from the moment the data arrived |
+| Manual refresh | Cooldown applies; the cooldown restarts when the refresh finishes, and the seconds on the popover are the real ones left |
+| Credential badge | The label to the right of the key field, with only two wordings — "a key is configured." and "no key is configured." — the same as DSH's own plugin cards |
+| Settings groups | Connection / Display / Thresholds / Refresh, all collapsed by default, expanded from their headers |
 
 ## Configuration
 
-Open **Plugins → Installed** and step into the **DeepSeek Balance** (shown as **DeepSeek 余额** in Chinese) details page — **the configuration sits right below the description, ready to edit** (there is no second Configure step on that row). Four groups are **all collapsed by default** — expand them from their headers:
+The card lives on the Plugins page: sidebar **Plugins** → "Installed" → click the **DeepSeek Balance** card to step into its details page.
 
 <p align="center">
-  <img src="assets/settings-cards-position_en.png" alt="Where the DeepSeek balance entry sits in the Plugins list" width="480">
+  <img src="assets/settings-cards-position_en.png" alt="Plugins page: this plugin's card sits under the Installed group" width="720">
   <br>
-  <em>Where it sits: the Plugins page's list view, with "DeepSeek Balance" alongside the other installed plugins; open its details page and the form shown above sits right below the description.</em>
+  <em>The Plugins page: this plugin's card sits under "Installed"; click it to open the details page. The small ring at the bottom of the left-hand bar is the status ring.</em>
 </p>
 
-- **Connection**: the API base URL and the credential, both blank by default — a blank URL means the official DeepSeek endpoint, and the credential is inherited from the official model page and is read-only.
-  The nested "Customised settings" holds only the credential reference name.
-- **Display**: which currency to use for amounts, or let it follow the account.
-- **Thresholds**: two alert lines per currency (warning / critical). **Within one currency the critical line must be strictly lower than the warning line** — equality is rejected too, and saving is blocked while it is.
-  But a hand-edited config file with an illegal pair **no longer errors** — the plugin **falls that pair back to its defaults** the moment it reads it, and logs one line.
+The configuration area is on the details page, right below the description, ready to edit. All four groups start collapsed:
 
-> **Upgrade note**: the settings live in this plugin's own entry config and the key it is filed under changed once; **old values are not migrated** — please fill the table above in once after upgrading.
-- **Refresh**: the server refresh interval, the UI poll interval and the manual refresh cooldown. The cooldown counts from **the moment the refresh finishes**, so the seconds shown in the popover are the real ones left; if the backend says the refresh did not fire, the UI takes its remaining time instead of pretending otherwise.
+- **Connection** — the API address and the credential. Both are blank by default: a blank address means the official endpoint; the credential inherits the one from the official model page and is read-only. The nested "Customized settings" holds only the credential reference name.
+- **Display** — which currency amounts use, or let it follow the account.
+- **Thresholds** — two lines per currency: a warning threshold and a critical threshold. Within one currency the **critical value must stay below the warning value**; saving is blocked otherwise.
+- **Refresh** — the server refresh interval, the UI poll interval and the manual refresh cooldown; the defaults suit most setups.
 
 Saving applies immediately; there is no need to restart DSH.
 
-### Reading the ring
+<p align="center">
+  <img src="assets/settings-card_en.png" alt="DeepSeek Balance details page: the four configuration groups below the description" width="360">
+  <br>
+  <em>The configuration area on the details page, pictured with the four groups expanded; they start collapsed and expand from their headers. A group with an invalid entry expands itself.</em>
+</p>
 
-- How full the ring is = the current balance as a fraction of that currency's **warning line**, capped at 100%; the critical line takes no part in drawing it — it already decided the colour.
-- Colour carries state only, never an amount: normal, low and critical each get one hue; an account that cannot be read gets a ring with a cross instead.
-- A currency with no threshold configured falls back to state: **a full ring for normal, 3/4 for low, 1/4 for critical**.
-  (Only the family with a balance to look at draws an arc — those three, plus the old number while data is stale;
-  an unreadable account, a suspended account, nothing connected, an account with no balance: none of those draw an arc.)
-- Why colour is never computed from an amount, and why thresholds are only a scale → [Data flow](docs/ARCHITECTURE.md#数据流).
+> **Upgrade note**: the keys these settings are filed under changed once with a host upgrade, and **old values are not migrated**; after upgrading, fill the four groups in again as above.
 
-### Credentials
+## Version compatibility
 
-The key is resolved only through DSH's credential channel; the card's "API key" inherits the one already configured on the official model settings page.
-When it comes from the launch environment (an environment variable) the field is read-only and the badge says where it came from.
-
-**The balance has two official routes and the plugin picks one itself**: the API key from the model settings page or the launch environment, and the **DSH account sign-in** (signed in without a key is enough). The order is:
-
-- **the route the current session is on** — switching sessions *or the model in this session* re-reads it at once;
-- with no session readable, the globally selected model's route;
-- with neither decidable, **key first, account as the fallback**;
-- only when both are missing does it read "no credential configured".
-
-The parenthesised label to the right of the popover title is where that number came from: `(API key)` / `(account sign-in)`.
-**Whichever is shown is also the one that gets refreshed and named** — display, refresh and label never disagree.
-
-**This plugin only tracks the official number**, so if the preferred route has nothing to show it falls back to the other official one: as long as either the account or an API key works, you still see a balance (even a slightly older snapshot). **You are only told about it when neither route can produce a number** — that is what "not connected to official" means. What the ring looks like at that moment: see [the ring at a glance](#the-ring-at-a-glance).
-
-**How long a key change takes to land follows DSH's own layers — this plugin deliberately adds nothing on top:**
-
-- **A key from the launch environment (an environment variable): restart DSH to change it.** A process's environment is fixed the moment it starts; a later change to that variable outside is invisible to the running plugin.
-- **A key changed on the official model settings page / in the credential store: no restart needed** — it lands by the next server refresh cycle at the latest (later while failure backoff is active); to see it at once, use the manual refresh in the popover (it is rate-limited).
-- Until then the UI still shows the **previous ledger**: the ledger identifier is derived from the key, so the two never mix, but the in-memory copy is only replaced once the next fetch succeeds.
-
-Why it is this way → [Key decisions](docs/ARCHITECTURE.md#关键决策).
-
-## Security and boundaries
-
-- **The API key is never returned to the UI**: the config endpoint returns only a fixed-length mask, not even the last few characters.
-- The key is never logged and never written to a file owned by this plugin; the settings file holds only a reference name, so the card is safe to screenshot or share.
-- Balance snapshots live in DSH's own data directory, grouped by an identifier derived from the credential — **changing the key opens a new ledger** and old snapshots are never mixed in.
-- That identifier also involves a random salt file in DSH's home directory; **lose it and old snapshots become unreadable** (they can never resolve to someone else's).
-- Only `api.deepseek.com` is contacted; nothing is proxied or forwarded.
+- **Which host version is required**: whatever `engines.dsh` in [package.json](package.json) declares; this plugin follows the host's current **RC line**. If you need the settings UI, upgrade the host to that line or above: `npm install -g @deepseek-ai/dsh@next`.
+- **The declaration is deliberately narrow**: the floor is the version we actually tested, meaning only "not below it" — no promise of future compatibility; when the host ships on another patch line, this floor goes up with it.
+- **Compatibility is measured**: weekly, [compat.yml](.github/workflows/compat.yml) runs the tests on the declared host line, plus a separate step checking the declared range still covers it; a red committed line opens a tracking issue. Verdicts and handling: [Compatibility](docs/PUBLISHING.md#兼容性).
 
 ## License
 
@@ -232,6 +137,6 @@ Why it is this way → [Key decisions](docs/ARCHITECTURE.md#关键决策).
 
 ## Contributing
 
-Where to report bugs, what to check before proposing a feature, and what to do before sending a PR → [CONTRIBUTING_en.md](CONTRIBUTING_en.md).
+What to include in a bug report, what to read before proposing a feature, what to run before a PR → [CONTRIBUTING_en.md](CONTRIBUTING_en.md).
 
-Design stance and implementation constraints → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the release flow and the version-bump decision chain → [docs/PUBLISHING.md](docs/PUBLISHING.md); the maintainer's document map → [AGENTS.md](AGENTS.md).
+Maintainer's document map → [AGENTS.md](AGENTS.md).
