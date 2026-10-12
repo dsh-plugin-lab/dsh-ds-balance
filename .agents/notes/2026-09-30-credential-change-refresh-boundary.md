@@ -20,7 +20,7 @@
 ## 决策
 
 1. **不订阅 `credentials/reference-updated`，生效时机以宿主层为准**：环境变量那一路**只能重启**（不可观测，没有第二选择），凭据库那一路**等下一个刷新周期**（节奏由 `serverRefreshSeconds` 决定）。
-2. **把边界写进对外门面**：根 [README.md](../../README.md) / [README_en.md](../../README_en.md) 的「凭据」小节给出用户能执行的三条事实；[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)「关键决策」留一条指针指到本条。
+2. **把边界写进对外门面**：根 [README.md](../../README.md) / [README_zh.md](../../README_zh.md) 的「凭据」小节给出用户能执行的三条事实；[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)「关键决策」留一条指针指到本条。
 3. **切换窗口期内界面显示旧账本，已知并接受**：本轮不作废快照、不加界面提示。
 
 ## 替代方案（想过，为什么不选）

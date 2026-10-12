@@ -44,5 +44,5 @@
 ## 影响
 
 - 代码：`src/client/locales.ts`（两档措辞）、`BalancePopover.tsx`（`PluginsAction` 契约）、`SidebarBalance.tsx`（快照类型与关浮层的位置）、`src/client/index.tsx`（入口快照带落点、两个挂载点）。
-- 活文档：根 [README.md](../../README.md) / [README_en.md](../../README_en.md) 的界面表、[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) 的阶段边界、[sidebar 手册](../../src/client/sidebar/README.md)。
+- 活文档：根 [README.md](../../README.md) / [README_zh.md](../../README_zh.md) 的界面表、[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) 的阶段边界、[sidebar 手册](../../src/client/sidebar/README.md)。
 - **本机要看到深链真的生效，先换宿主线**（`npm view @deepseek-ai/dsh dist-tags` 现查；升级要重启进程，重启后旧标签页 token 失效）。在那之前，本机的正确表现就是「打开插件页 ⇒ 列表页」。

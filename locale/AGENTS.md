@@ -35,7 +35,7 @@
 
 ## 改这里的文案要顺带查
 
-- 门面 [README.md](../README.md) / [README_en.md](../README_en.md) 里点名插件的地方 —— 红线钉着逐字一致。
+- 门面 [README.md](../README.md) / [README_zh.md](../README_zh.md) 里点名插件的地方 —— 红线钉着逐字一致。
 - [assets/AGENTS.md](../assets/AGENTS.md) 的「什么时候必须重截」：插件页上的标题与描述**画在图上**，
   所以改了这两份 JSON，`settings-card*.png` 与 `settings-cards-position*.png` 四张都要重拍。
 - **换图标**（`icon.svg`）：`package.json` 的 `icon`、`files` 与文件本身必须同批改 ——

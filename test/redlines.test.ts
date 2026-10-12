@@ -300,8 +300,8 @@ describe('插件展示元数据', () => {
     expect(typeof en === 'string' && en !== '', 'locale/en.json 的 meta.title 不是非空字符串').toBe(
       true,
     )
-    expect(readFileSync('README.md', 'utf8')).toContain(zh as string)
-    expect(readFileSync('README_en.md', 'utf8')).toContain(en as string)
+    expect(readFileSync('README_zh.md', 'utf8')).toContain(zh as string)
+    expect(readFileSync('README.md', 'utf8')).toContain(en as string)
   })
 })
 
@@ -381,7 +381,7 @@ describe('文档不抄实测值', () => {
   ]
 
   /** 门面双件：装之前必须看得见兼容范围，所以允许留值 —— 但必须与真源同行。 */
-  const FACADE = ['README.md', 'README_en.md']
+  const FACADE = ['README.md', 'README_zh.md']
 
   /** 真源。留值的那一行必须自己写出处。 */
   const HOME = 'package.json'
@@ -458,7 +458,7 @@ describe('文档不抄实测值', () => {
     )?.[1]
     expect(tracked, 'scripts/check-declaration.mjs 里读不出 TRACKED_LINE').toBeDefined()
 
-    const readmes = ['README.md', 'README_en.md'].map((file) => readFileSync(file, 'utf8'))
+    const readmes = ['README.md', 'README_zh.md'].map((file) => readFileSync(file, 'utf8'))
     let seen = 0
     for (const text of readmes) {
       for (const match of text.matchAll(/npm install -g @deepseek-ai\/dsh@([a-z]+)/g)) {
@@ -1282,7 +1282,7 @@ describe('核心活文档的首行标题', () => {
   /**
    * 门面双件的**结构**对齐。
    *
-   * 「逐条对齐」以前只写在散文里（根 AGENTS.md 的「改根 README 必同改 README_en」），
+   * 「逐条对齐」以前只写在散文里（根 AGENTS.md 的「改根 README 必同改 README_zh」），
    * 于是英文那份漂过两次都没人发现：一次是安装节里多出整段 compat 巡检、
    * 一次是 h1 被套进 `<p>`（无效嵌套，只有中文那份裸写着）。文字可以各说各的语言，
    * **节序、表块、图序必须同形** —— 那是「逐条对齐」这句话的可执行判据。
@@ -1305,23 +1305,23 @@ describe('核心活文档的首行标题', () => {
           return []
         })
 
-    const zh = shape('README.md')
+    const en = shape('README.md')
     // 反向控制：结构指纹必须真的看到了东西，否则下面那条是空转的假绿。
-    expect(zh.length, '结构指纹的长度').toBeGreaterThan(30)
+    expect(en.length, '结构指纹的长度').toBeGreaterThan(30)
     // **图片必须在指纹里**：图行是缩进过的（`  <img …`），锚定 `^<img` 会让它一条都取不到 ——
     // 那样「图序对齐」这句就是空话。这条同时是那条正则的行锚定控制。
     expect(
-      zh.filter((item) => item.startsWith('image:')),
+      en.filter((item) => item.startsWith('image:')),
       '结构指纹里必须取到三张门面图（去掉 `_en` 后缀后两侧同名）',
     ).toEqual([
       'image:assets/sidebar-popover.png',
       'image:assets/settings-cards-position.png',
       'image:assets/settings-card.png',
     ])
-    expect(shape('README_en.md'), '英文门面的节序 / 表块 / 图序必须与中文逐条对齐').toEqual(zh)
+    expect(shape('README_zh.md'), '中文门面的节序 / 表块 / 图序必须与英文门面逐条对齐').toEqual(en)
     // 反向控制：删掉一节，指纹必须变得不相等。
     const withoutConfig = shape('README.md').filter((item) => item !== 'bullet')
-    expect(withoutConfig).not.toEqual(zh)
+    expect(withoutConfig).not.toEqual(en)
   })
 
   it('判据本身有牙齿（被覆盖的标题必须被抓出来）', () => {

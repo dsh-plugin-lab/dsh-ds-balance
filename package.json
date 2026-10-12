@@ -43,7 +43,7 @@
     "!lib/**/*.map",
     "cordis.patch.yml",
     "README.md",
-    "README_en.md",
+    "README_zh.md",
     "LICENSE"
   ],
   "engines": {

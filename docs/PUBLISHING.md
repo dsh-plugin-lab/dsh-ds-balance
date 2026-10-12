@@ -183,7 +183,7 @@ Q0 是这道链上最常被跳过的一问：一个几百行的内部重构，�
 
 [package.json](../package.json) 的 `files` 是唯一来源，别处不再抄一份清单。
 当前打包：`lib/`（去掉 sourcemap）、`cordis.patch.yml`、`locale/*.json`（插件展示元数据的中英两份）、
-`icon.svg`（插件图标）、`README.md`、`README_en.md`、`LICENSE`。`package.json` 由 npm 强制包含。
+`icon.svg`（插件图标）、`README.md`（英文门面）、`README_zh.md`（中文门面）、`LICENSE`。`package.json` 由 npm 强制包含。
 
 `assets/`、`docs/`、`test/`、`scripts/`、`.github/`、`.agents/` 都不进包；`locale/AGENTS.md` 也不进 ——
 那是有意的：宿主只枚举 `locale/` 下的 `*.json`，规则文档留在仓库里，不跟着包出去。

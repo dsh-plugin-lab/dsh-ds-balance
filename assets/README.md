@@ -1,17 +1,17 @@
 # assets/ — 门面截图手册
 
 - 职责：放**界面实拍截图**，供根门面引用。
-- 变更影响路由：换图或改名 → 同步 [README.md](../README.md) 与 [README_en.md](../README_en.md) 的引用；改判据 → 同步 [AGENTS.md](AGENTS.md)。
+- 变更影响路由：换图或改名 → 同步 [README.md](../README.md) 与 [README_zh.md](../README_zh.md) 的引用；改判据 → 同步 [AGENTS.md](AGENTS.md)。
 - 使用约束与工作偏好 → 见 [AGENTS.md](AGENTS.md)。
 
 ## 文件与引用面
 
 - `sidebar-popover.png`：左边栏底部的条目与展开的余额浮层，中文实拍（515×480，取景左右边界按侧栏容器与浮层的并集裁，右侧不含任何聊天区元素），被根 [README.md](../README.md) 引用。
-- `sidebar-popover_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
+- `sidebar-popover_en.png`：同一画面的英文版，被 [README.md](../README.md) 引用。
 - `settings-card.png`：插件详情页的中文实拍（**从图标 / 标题 / 版本 tag / 描述那一块到保存按钮**，四组全展开），被根 [README.md](../README.md) 引用。
-- `settings-card_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
+- `settings-card_en.png`：同一画面的英文版，被 [README.md](../README.md) 引用。
 - `settings-cards-position.png`：**Plugins 页列表视图**的中文实拍（左侧栏收起态 + Official / Installed 两组列表，本插件在已安装里可见，卡片上写的是显示名「DeepSeek 余额」），被根 [README.md](../README.md) 引用。
-- `settings-cards-position_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
+- `settings-cards-position_en.png`：同一画面的英文版，被 [README.md](../README.md) 引用。
 
 六张都是**从真实界面实拍**的：界面语言当前是 English，所以先拍全部 `_en` 图，再切成中文拍中文版，最后切回 English。
 重截流程、判据与验收标准见 [AGENTS.md](AGENTS.md)。

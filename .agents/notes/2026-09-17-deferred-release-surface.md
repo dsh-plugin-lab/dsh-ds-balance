@@ -48,4 +48,4 @@
 
 ## 关联
 
-- [根门面](../../README.md) · [英文门面](../../README_en.md) · [发布前检查](../../scripts/check-release.mjs) · [工程规范对齐](2026-09-17-zhihu-search-alignment.md)
+- [根门面](../../README.md) · [中文门面](../../README_zh.md)（原 `README_en.md`，2026-10-12 改名） · [发布前检查](../../scripts/check-release.mjs) · [工程规范对齐](2026-09-17-zhihu-search-alignment.md)

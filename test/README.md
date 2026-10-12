@@ -5,7 +5,7 @@
 - 契约测试单独一条入口：`npm run test:contract`（要 `DSH_CI_API_KEY`，缺了回落 `DEEPSEEK_API_KEY`；打真实上游，**不进 ci.yml**）。
 - 变更影响路由：改 `src/domain/` 的判定规则 → 必须同步对应测试；改契约形状 → 同步 [docs/BACKEND-CONTRACTS.md](../docs/BACKEND-CONTRACTS.md) §13 的测试表。
 - 变更影响路由：改包的**展示面**（`locale/*.json`、`icon.svg`、`package.json` 的 `icon` / `exports` / `files`）→ 同步 [scripts/check-release.mjs](../scripts/check-release.mjs)
-  的覆盖断言与 `redlines.test.ts` 的「插件展示元数据」一组，以及门面 [README.md](../README.md) / [README_en.md](../README_en.md)。
+  的覆盖断言与 `redlines.test.ts` 的「插件展示元数据」一组，以及门面 [README.md](../README.md) / [README_zh.md](../README_zh.md)。
 - 使用约束与工作偏好 → 见 [AGENTS.md](AGENTS.md)。
 
 ## 文件规则

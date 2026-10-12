@@ -5,143 +5,143 @@
 <h1 align="center">dsh-ds-balance</h1>
 
 <div align="center">
-  <p><strong>把 DeepSeek 账户余额放进 DSH 的左边栏</strong></p>
-  <p><em>DeepSeek account balance in the DSH sidebar</em></p>
+  <p><strong>DeepSeek account balance in the DSH sidebar</strong></p>
+  <p><em>把 DeepSeek 账户余额放进 DSH 的左边栏</em></p>
 
   <p>
-    <a href="https://api-docs.deepseek.com/"><img src="https://img.shields.io/badge/DeepSeek%20API-Official-4D6BFE?style=flat" alt="DeepSeek 官方接口"></a>
-    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat&logo=deepseek&logoColor=white" alt="由 dsh 驱动"></a>
+    <a href="https://api-docs.deepseek.com/"><img src="https://img.shields.io/badge/DeepSeek%20API-Official-4D6BFE?style=flat" alt="DeepSeek official API"></a>
+    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat&logo=deepseek&logoColor=white" alt="powered by dsh"></a>
   </p>
 
   <p>
     <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml"><img src="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/npm/v/dsh-ds-balance.svg?style=flat" alt="npm"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" alt="MIT 许可证"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" alt="MIT License"></a>
     <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/badge/SLSA-Build%20L2-green?logo=slsa&style=flat" alt="SLSA Build L2"></a>
   </p>
 
   <p>
-    各版本改动 → <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/releases">Releases</a>（与 npm 版本一一对应）
+    Per-version changes → <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/releases">Releases</a> (one-to-one with npm versions)
   </p>
 
   <p>
-    <strong><a href="README.md">简体中文</a></strong> · <a href="README_en.md">English</a>
+    <a href="README_zh.md">简体中文</a> · <strong><a href="README.md">English</a></strong>
   </p>
 </div>
 
 ---
 
-左边栏底部常驻一个状态环，点开能看到具体的余额数字。要改配置，进侧栏的 **插件（Plugins）** 页，点开本插件。
+A status ring is pinned to the bottom of the sidebar; clicking it shows the actual balance figures. To change settings, open the **Plugins** page in the sidebar and pick this plugin.
 
-## 数据与凭据
+## Data and credentials
 
-余额直接读 DeepSeek 官方接口，不是根据用量估算的。
+The balance is read directly from the official DeepSeek API, not estimated from usage.
 
-- 凭据由 DSH 的凭据通道解析，插件不自己保存密钥：密钥不会写进设置文件，也不会返回给界面。
-- 配置接口对密钥只回一个固定长度的掩码，连末几位也不给；密钥不落日志，不落本插件的任何文件。
-- 只访问 `api.deepseek.com`，不代理、不转发其他流量。
-- 余额快照按凭据分开存放 —— **换 key 会重新开始记账**，旧的数字不会混进来。
+- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file and is never returned to the UI.
+- The configuration endpoint answers with only a fixed-length mask for the key, not even its last characters; a key is never logged and never written to any file of this plugin.
+- Only `api.deepseek.com` is contacted; no other traffic is proxied or forwarded.
+- Balance snapshots are stored per credential — **changing the key starts keeping records afresh**, so old figures are never mixed in.
 
-## 上手
+## Getting started
 
-**前置**：DSH 跟的是当前那条 RC 线（安装时写明 `@next`）；Node `>= 20`。兼容范围的唯一出处是 [package.json](package.json) 的 `engines.dsh`。
+**Prerequisites**: DSH on its current RC line (specify `@next` when installing); Node `>= 20`. The only source for the compatible range is `engines.dsh` in [package.json](package.json).
 
-1. 装宿主。`latest` 与 `alpha` 都不是我们声明的那条线，请写明版本线：
+1. Install the host. Neither `latest` nor `alpha` is the line we declare, so specify the version line:
 
     ```bash
     npm install -g @deepseek-ai/dsh@next
     ```
 
-2. 装插件：
+2. Install the plugin:
 
     ```bash
     dsh plugin --profile web add dsh-ds-balance
     ```
 
-3. 启动（或重启）`dsh --profile web`，左边栏底部就会出现余额条目。
+3. Start (or restart) `dsh --profile web`; the balance entry appears at the bottom of the sidebar.
 
-从源码安装：`git clone` 之后 `npm install && npm run build`，再执行 `dsh plugin --profile web add "$PWD"`，同样重启生效。
-那一步 `npm install` 不能省 —— 按路径挂载时依赖由仓库自己提供，漏装会让插件显示「未运行」。
+From source: `git clone`, then `npm install && npm run build`, then `dsh plugin --profile web add "$PWD"` — the same restart applies.
+That `npm install` cannot be skipped: under a path install the repository supplies its own dependencies, and missing them makes the plugin show as "not running".
 
-## 显示什么
+## What it shows
 
-三处界面，各管一件事：
+Three surfaces, each with one job:
 
-| 界面 | 位置 | 做什么 |
+| Surface | Where | What it does |
 |---|---|---|
-| 状态环 | 左边栏底部，常驻 | 一眼看得出还剩多少、离预警线多远 |
-| 余额浮层 | 点条目展开 | 看总额、赠送 / 充值拆分，以及数据是几分钟前的 |
-| 设置卡片 | Plugins 页里本插件的详情页 | 换端点、换币种、调预警线、调刷新节奏 |
+| Status ring | Pinned to the bottom of the sidebar | See at a glance how much is left and how close you are to the warning threshold |
+| Balance popover | Click to expand | See the total, the granted / topped-up split, and how many minutes old the data is |
+| Settings card | This plugin's details page under Plugins | Change the endpoint, the currency, the warning thresholds, the refresh cadence |
 
 <p align="center">
-  <img src="assets/sidebar-popover.png" alt="左边栏底部的「DeepSeek 余额」条目与展开的余额浮层" width="360">
+  <img src="assets/sidebar-popover_en.png" alt="The DeepSeek Balance entry at the bottom of the sidebar, with the balance popover expanded" width="360">
   <br>
-  <em>条目常驻左边栏底部，点开是余额浮层：总额、赠送 / 充值拆分、数据是几分钟前的，右下角是手动刷新。</em>
+  <em>The entry is pinned to the bottom of the sidebar; clicking it opens the balance popover: the total, the granted / topped-up split, how many minutes ago the data was, and manual refresh at the bottom right.</em>
 </p>
 
-环本身就是「现在是什么情况」，一眼能分出五种：
+The ring itself is "what is going on right now", five states you can tell apart at a glance:
 
-| 环的样子 | 意思 | 你该做什么 |
+| The ring | Meaning | What you do |
 |---|---|---|
-| 彩环 + 一段弧 | 有余额，颜色表示多还是少 | 看数字 |
-| 灰环 + 一段缺口在转 | 正在取，还没结果 | 等 |
-| 灰环 + 中间一个 **＋** | 还没接入账户 | 去配置 |
-| 灰色空环 | 已接入账户，本身没有余额 | 不用管 |
-| 红环 + 中间一个 **叉** | 这里没有可用的数字 | 去查 |
+| Coloured ring + an arc | There is a balance; the colour says more or less | Read the number |
+| Grey ring + a rotating gap | Fetching, no result yet | Wait |
+| Grey ring + a **+** in the middle | Not connected to your account yet | Configure it |
+| Grey, empty ring | Connected to your account, which simply has no balance | Nothing |
+| Red ring + a **cross** in the middle | No usable number here | Check it |
 
-## 每样东西是什么
+## What each thing is
 
-| 东西 | 说明 |
+| Thing | What it means |
 |---|---|
-| 弧长 | 余额占该币种**预警线**的比例，满格封顶一整圈 |
-| 颜色 | 只表示状态（正常 / 偏低 / 告急），与金额大小无关；**告急线只决定颜色**，不参与画环 |
-| 中心记号 | **＋** 是还没接入，去配置；**叉**是这里没有可用的数字 —— 读不到，或者读到了但账户不能用 |
-| 悬停提示 | 数字可信时显示**金额**，其余情况显示这个状态自己的话；收起态与展开态说的是同一句 |
-| 来源括号 | 浮层标题右侧的 `（API Key）` / `（账号登录）`，标的是这个数字的来路；显示哪条就刷哪条 |
-| 数据新鲜度 | 浮层里的「多久之前」，从收到数据的时刻算起 |
-| 手动刷新 | 带冷却，冷却从刷完那一刻重新计时，浮层上的秒数就是真实剩余 |
-| 凭据徽标 | 密钥那一行右边的标签，只有「已配置密钥。」与「未配置密钥。」两种，与 DSH 自带的插件卡片一致 |
-| 设置分组 | 连接 / 展示 / 阈值 / 刷新，默认全部收起，点组头展开 |
+| Arc length | The balance as a share of that currency's **warning threshold**, capped at a full circle |
+| Colour | State only (normal / low / critical), never the amount; the **critical threshold only sets the colour** and takes no part in drawing the ring |
+| The mark in the middle | **+** means not connected yet; go configure; **cross** means no usable number here — it could not be read, or it was read but the account cannot be used |
+| Hover text | The **amount** when the number is trustworthy, that state's own line otherwise; collapsed and expanded say the same sentence |
+| The source bracket | `(API key)` / `(account sign-in)` to the right of the popover title marks where this number came from; whichever is shown is the one refreshed |
+| Data freshness | The "how long ago" in the popover, counted from the moment the data arrived |
+| Manual refresh | Cooldown applies; the cooldown restarts when the refresh finishes, and the seconds on the popover are the real ones left |
+| Credential badge | The label to the right of the key field, with only two wordings — "a key is configured." and "no key is configured." — the same as DSH's own plugin cards |
+| Settings groups | Connection / Display / Thresholds / Refresh, all collapsed by default, expanded from their headers |
 
-## 配置
+## Configuration
 
-卡片在 Plugins 页：侧边栏 **插件（Plugins）** →「已安装」→ 点 **DeepSeek 余额** 卡片进详情页。
-
-<p align="center">
-  <img src="assets/settings-cards-position.png" alt="插件页：本插件的卡片在「已安装」分组下" width="720">
-  <br>
-  <em>插件页：本插件的卡片在「已安装」下，点卡片进详情页；左边那条栏底部的小环就是状态环。</em>
-</p>
-
-配置区在详情页，描述下面，直接可改。四组默认全收起：
-
-- **连接** —— API 地址与凭据。两项默认留空：地址留空即用官方端点；凭据继承官方模型页那一份，只读不可改。二级「自定义设置」里只有凭据引用名。
-- **展示** —— 金额用哪种币种，或让它跟随账户。
-- **阈值** —— 每个币种两条线：预警线与告急线。同一币种内**告急值必须低于预警值**，保存时会拦下来。
-- **刷新** —— 服务端刷新周期、界面轮询周期与手动刷新冷却；默认值适用于大多数情况。
-
-保存即生效，不必重启 DSH。
+The card lives on the Plugins page: sidebar **Plugins** → "Installed" → click the **DeepSeek Balance** card to step into its details page.
 
 <p align="center">
-  <img src="assets/settings-card.png" alt="DeepSeek 余额详情页：描述下面的四组配置" width="360">
+  <img src="assets/settings-cards-position_en.png" alt="Plugins page: this plugin's card sits under the Installed group" width="720">
   <br>
-  <em>详情页的配置区，截图中四组是展开的；默认全收起，点组头逐组展开。组里有填错的项时，那一组会自己展开。</em>
+  <em>The Plugins page: this plugin's card sits under "Installed"; click it to open the details page. The small ring at the bottom of the left-hand bar is the status ring.</em>
 </p>
 
-> **升级提示**：设置项的键名跟着宿主升级改过一次，**旧值不会自动迁移**；升级之后请按上面四组重填一次。
+The configuration area is on the details page, right below the description, ready to edit. All four groups start collapsed:
 
-## 版本兼容
+- **Connection** — the API address and the credential. Both are blank by default: a blank address means the official endpoint; the credential inherits the one from the official model page and is read-only. The nested "Customized settings" holds only the credential reference name.
+- **Display** — which currency amounts use, or let it follow the account.
+- **Thresholds** — two lines per currency: a warning threshold and a critical threshold. Within one currency the **critical value must stay below the warning value**; saving is blocked otherwise.
+- **Refresh** — the server refresh interval, the UI poll interval and the manual refresh cooldown; the defaults suit most setups.
 
-- **要哪一版宿主**：以 [package.json](package.json) 的 `engines.dsh` 为准 —— 那个范围写明本插件覆盖**哪几条宿主线**（含上限，上限之外不受支持）。需要配置界面就把宿主升到最新那条线：`npm install -g @deepseek-ai/dsh@next`。
-- **声明按线显式枚举**：只承诺 `engines.dsh` 里列出的那几条线；跨到上限之外的新线，要先在 [compat.yml](.github/workflows/compat.yml) 的矩阵里实测过、再把它写进声明，不自动跟着宿主走。**已列线内的补丁版本（含预发布）不需要动声明**。
-- **兼容性是实测出来的**：每周由 [compat.yml](.github/workflows/compat.yml) 在声明的那条宿主线上跑一遍测试，另有一步单独核对声明范围是否还罩得住；承诺线红了会开一条跟踪 issue。结论与处置见 [兼容性](docs/PUBLISHING.md#兼容性)。
+Saving applies immediately; there is no need to restart DSH.
 
-## 许可
+<p align="center">
+  <img src="assets/settings-card_en.png" alt="DeepSeek Balance details page: the four configuration groups below the description" width="360">
+  <br>
+  <em>The configuration area on the details page, pictured with the four groups expanded; they start collapsed and expand from their headers. A group with an invalid entry expands itself.</em>
+</p>
 
-[MIT](LICENSE)。
+> **Upgrade note**: the keys these settings are filed under changed once with a host upgrade, and **old values are not migrated**; after upgrading, fill the four groups in again as above.
 
-## 贡献
+## Version compatibility
 
-缺陷与需求走仓库 Issues。
+- **Which host version is required**: whatever `engines.dsh` in [package.json](package.json) declares — that range names the host **lines** this plugin covers, ceiling included; anything past the ceiling is not supported. If you need the settings UI, upgrade the host to the newest line: `npm install -g @deepseek-ai/dsh@next`.
+- **The declaration enumerates lines explicitly**: only the lines listed in `engines.dsh` are promised. A new line past the ceiling becomes supported only after it has been measured in the [compat.yml](.github/workflows/compat.yml) matrix and written into the declaration; it does not follow the host automatically. **Patch releases inside a listed line (prereleases included) need no declaration change**.
+- **Compatibility is measured**: weekly, [compat.yml](.github/workflows/compat.yml) runs the tests on the declared host line, plus a separate step checking the declared range still covers it; a red committed line opens a tracking issue. Verdicts and handling: [Compatibility](docs/PUBLISHING.md#兼容性).
 
-维护者文档地图 → [AGENTS.md](AGENTS.md)。
+## License
+
+[MIT](LICENSE).
+
+## Contributing
+
+Bugs and requests go to the repository Issues.
+
+Maintainer's document map → [AGENTS.md](AGENTS.md).
