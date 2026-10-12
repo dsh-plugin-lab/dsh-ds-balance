@@ -401,9 +401,12 @@ async function swap(line, dropPrefix, onlyPrefix) {
   //      （探针 3 实测通过：verify 11/11 全落在目标线）。
   // 删掉两者，让 npm 只按新 manifest 解。回滚不变：git checkout 取回两个文件，
   // node_modules 由 install 重建。
-  if (existsSync('package-lock.json')) {
-    rmSync('package-lock.json')
-    console.log('已删 package-lock.json（它记着换线前的解析）。')
+  // 两种锁文件都清：npm 仓只有前者，pnpm 仓只有后者。
+  for (const lock of ['package-lock.json', 'pnpm-lock.yaml']) {
+    if (existsSync(lock)) {
+      rmSync(lock)
+      console.log(`已删 ${lock}（它记着换线前的解析）。`)
+    }
   }
   if (existsSync('node_modules')) {
     rmSync('node_modules', { recursive: true, force: true })
