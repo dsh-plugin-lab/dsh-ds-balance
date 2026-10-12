@@ -25,7 +25,8 @@
   引入组件库、Tailwind 或字面色值的 PR 不会合。
 - 颜色只由后端 `severity` 决定。任何「按金额阈值在前端上色」的设计都不接受。
 - 新增配置字段要同时改宿主 schema、`CONFIG_FIELDS`、两份词典与根门面 ——
-  四处清单与同步点见 [src/client/settings/README.md](src/client/settings/README.md)。
+  同步点见 [src/client/settings/README.md](src/client/settings/README.md)（宿主 schema 与 `CONFIG_FIELDS`）
+  与 [locale/AGENTS.md](locale/AGENTS.md)（两份词典与门面点名）。
 
 ## 提 PR 前
 
