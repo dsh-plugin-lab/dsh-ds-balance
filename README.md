@@ -127,8 +127,8 @@
 
 ## 版本兼容
 
-- **要哪一版宿主**：以 [package.json](package.json) 的 `engines.dsh` 为准，本插件跟的是宿主当前那条 **RC 线**。需要配置界面就把宿主升到那条线或更高：`npm install -g @deepseek-ai/dsh@next`。
-- **声明是有意写窄的**：下限是我们实测过的那一版，只表示「不低于它」，不承诺以后都兼容 —— 宿主换一条补丁线再发版时，这个下限要跟着抬一次。
+- **要哪一版宿主**：以 [package.json](package.json) 的 `engines.dsh` 为准 —— 那个范围写明本插件覆盖**哪几条宿主线**（含上限，上限之外不受支持）。需要配置界面就把宿主升到最新那条线：`npm install -g @deepseek-ai/dsh@next`。
+- **声明按线显式枚举**：只承诺 `engines.dsh` 里列出的那几条线；跨到上限之外的新线，要先在 [compat.yml](.github/workflows/compat.yml) 的矩阵里实测过、再把它写进声明，不自动跟着宿主走。**已列线内的补丁版本（含预发布）不需要动声明**。
 - **兼容性是实测出来的**：每周由 [compat.yml](.github/workflows/compat.yml) 在声明的那条宿主线上跑一遍测试，另有一步单独核对声明范围是否还罩得住；承诺线红了会开一条跟踪 issue。结论与处置见 [兼容性](docs/PUBLISHING.md#兼容性)。
 
 ## 许可

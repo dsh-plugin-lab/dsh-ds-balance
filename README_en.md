@@ -127,8 +127,8 @@ Saving applies immediately; there is no need to restart DSH.
 
 ## Version compatibility
 
-- **Which host version is required**: whatever `engines.dsh` in [package.json](package.json) declares; this plugin follows the host's current **RC line**. If you need the settings UI, upgrade the host to that line or above: `npm install -g @deepseek-ai/dsh@next`.
-- **The declaration is deliberately narrow**: the floor is the version we actually tested, meaning only "not below it" — no promise of future compatibility; when the host ships on another patch line, this floor goes up with it.
+- **Which host version is required**: whatever `engines.dsh` in [package.json](package.json) declares — that range names the host **lines** this plugin covers, ceiling included; anything past the ceiling is not supported. If you need the settings UI, upgrade the host to the newest line: `npm install -g @deepseek-ai/dsh@next`.
+- **The declaration enumerates lines explicitly**: only the lines listed in `engines.dsh` are promised. A new line past the ceiling becomes supported only after it has been measured in the [compat.yml](.github/workflows/compat.yml) matrix and written into the declaration; it does not follow the host automatically. **Patch releases inside a listed line (prereleases included) need no declaration change**.
 - **Compatibility is measured**: weekly, [compat.yml](.github/workflows/compat.yml) runs the tests on the declared host line, plus a separate step checking the declared range still covers it; a red committed line opens a tracking issue. Verdicts and handling: [Compatibility](docs/PUBLISHING.md#兼容性).
 
 ## License
