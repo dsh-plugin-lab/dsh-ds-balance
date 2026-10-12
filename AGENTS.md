@@ -4,7 +4,7 @@
 
 - **已发布到哪一版一律现查，不抄进本文档**（抄一次就得多跟一次）：
   `npm view dsh-ds-balance version dist-tags`、`git tag --sort=-creatordate`、
-  [GitHub Releases](https://github.com/zlZayn/dsh-ds-balance/releases)。
+  [GitHub Releases](https://github.com/dsh-plugin-lab/dsh-ds-balance/releases)。
   发布走 [release.yml](.github/workflows/release.yml)（Trusted Publishing，带 provenance）；
   每版的产物一致性（本地 `npm pack` 的 sha1 对 npm 上的 `dist.shasum`）记在**那次 bump 提交**里。
   **本文档此前抄了「已发布 2.1.1」与逐版流水，落后了两版** —— 这就是不抄的理由。
