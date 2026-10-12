@@ -250,3 +250,4 @@
 - 测试手册 → [test/README.md](test/README.md)；构建脚本 → [scripts/README.md](scripts/README.md)
 - 门面截图与判据 → [assets/README.md](assets/README.md) · [assets/AGENTS.md](assets/AGENTS.md)
 - 插件展示面（插件页上的标题、描述与图标）与改它的规则 → [locale/AGENTS.md](locale/AGENTS.md) · [icon.svg](icon.svg)
+- 跨仓规范 → [plugin-conventions](https://github.com/dsh-plugin-lab/.github/blob/main/docs/plugin-conventions.md)
