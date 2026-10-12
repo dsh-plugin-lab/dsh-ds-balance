@@ -17,6 +17,11 @@
     <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml"><img src="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/npm/v/dsh-ds-balance.svg?style=flat" alt="npm"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" alt="MIT License"></a>
+    <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/badge/SLSA-Build%20L2-green?logo=slsa&style=flat" alt="SLSA Build L2"></a>
+  </p>
+
+  <p>
+    Per-version changes → <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/releases">Releases</a> (one-to-one with npm versions)
   </p>
 
   <p>

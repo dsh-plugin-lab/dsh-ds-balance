@@ -17,6 +17,11 @@
     <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml"><img src="https://github.com/dsh-plugin-lab/dsh-ds-balance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/npm/v/dsh-ds-balance.svg?style=flat" alt="npm"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat" alt="MIT 许可证"></a>
+    <a href="https://www.npmjs.com/package/dsh-ds-balance"><img src="https://img.shields.io/badge/SLSA-Build%20L2-green?logo=slsa&style=flat" alt="SLSA Build L2"></a>
+  </p>
+
+  <p>
+    各版本改动 → <a href="https://github.com/dsh-plugin-lab/dsh-ds-balance/releases">Releases</a>（与 npm 版本一一对应）
   </p>
 
   <p>
