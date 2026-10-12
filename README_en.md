@@ -137,6 +137,6 @@ Saving applies immediately; there is no need to restart DSH.
 
 ## Contributing
 
-What to include in a bug report, what to read before proposing a feature, what to run before a PR → [CONTRIBUTING_en.md](CONTRIBUTING_en.md).
+Bugs and requests go to the repository Issues.
 
 Maintainer's document map → [AGENTS.md](AGENTS.md).

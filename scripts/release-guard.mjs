@@ -40,8 +40,6 @@ const NON_ARTIFACT_FILES = new Set([
   '.gitignore',
   '.node-version',
   'AGENTS.md',
-  'CONTRIBUTING.md',
-  'CONTRIBUTING_en.md',
   'package-lock.json',
   'vitest.config.ts',
   'vitest.contract.config.ts',

@@ -9,7 +9,7 @@ settings/ 特有约束：
   - 唯一的读阈值处是圆环弧长（`../model.ts` 的 `ringRatioOf`），且只读 `warn`。
 - 不许 import 官方 `ui-settings-plugins` 的内部构件（bundle-purity gate 会拒），只能照抄模式。
 - 数字字段用 `type="text"` + `inputMode="numeric"`，不用 `type="number"`（[fields.tsx](fields.tsx) 的 `TextControl`）。
-- 新增字段必须同时改宿主 schema（[src/config.ts](../../config.ts) 的 `Config`）与 `CONFIG_FIELDS`（[use-config-form.ts](use-config-form.ts)），否则两半漂移。
+- 新增字段必须**同批改四处**，漏一处就漂：宿主 schema（[../../config.ts](../../config.ts) 的 `Config`）· `CONFIG_FIELDS`（[use-config-form.ts](use-config-form.ts)）· 两份词典（[../locales.ts](../locales.ts) 的 `en` / `zh`，键集必须逐字相同）· 根门面 [README.md](../../../README.md) / [README_en.md](../../../README_en.md) 里点名该字段的地方（两侧同改，红线钉着逐字一致）。
 - **跨字段约束宿主侧已经拦不住**：登记用的 `ctx.settings.register` 连同它的 `validate` 选项一起被删，
   schemastery 也没有 refine 这类跨字段钩子，而官方文档承诺的 `.check()` 在实现里根本不存在。
   现在只剩两处：**消费侧** `../../config.ts` 的 `resolveThresholdPairs`（违规即回落默认值 + 一次 warn），

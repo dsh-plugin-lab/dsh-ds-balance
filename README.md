@@ -137,6 +137,6 @@
 
 ## 贡献
 
-报 bug 要带什么、提功能前先看什么、提 PR 前跑什么 → [CONTRIBUTING.md](CONTRIBUTING.md)。
+缺陷与需求走仓库 Issues。
 
 维护者文档地图 → [AGENTS.md](AGENTS.md)。

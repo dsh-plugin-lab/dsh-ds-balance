@@ -249,5 +249,6 @@
 ## 阶段边界
 
 - 不做：Estimation（账本 / 投影 / 手工校正）、诊断层、独立页面、图表、多厂商模板、SSE。
+- **范围外（要做得先讨论归属）**：历史曲线、告警推送、多账户汇总 —— 本插件只做**展示余额**与**配置这个展示**两件事。
 - **已做（2026-09-25）**：到本插件配置格的深链。宿主在 `next` 线起于 ui-plugin-manager 里 provide 了 `pluginNavigation.openBundle(包名)`，浮层右上角图标特征检测到它就直达该 bundle 的配置格，服务缺席或调用抛错退回 Plugins 列表（两条都不通只 `console.warn`，不留死按钮）。
   **判据不是版本号而是服务在不在** —— 同一份产物落在不同宿主线上就是不同落点，所以**话术也分两档**（`PluginsAction.reachesConfig`：能直达说「打开插件配置页」，只能到列表说「打开插件页」；一句话盖不住两种落点，界面也不许说得比落点远）。装到没有那条缝的宿主上时这条链整条不存在 —— 本机主实例踩过一次，勘误与证据 → [../.agents/notes/2026-09-25-deep-link-needs-host-service.md](../.agents/notes/2026-09-25-deep-link-needs-host-service.md)。现状与证据 → [../src/client/sidebar/README.md](../src/client/sidebar/README.md)。

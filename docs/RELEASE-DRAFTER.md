@@ -54,8 +54,6 @@
 **排除**：`skip-changelog`（本批新建）。依赖更新这类「合了但用户看不到」的改动打这个标签，
 它会从**所有**分类里排除（`pre-exclude`），不落 Other Changes。
 
-贡献者要做什么，见 [../CONTRIBUTING.md](../CONTRIBUTING.md) 的「PR 标签」一节。
-
 ## 本仓的适配情况（重要）
 
 **Release Drafter 读的是 PR，不是 commit。** 而本仓有两段历史：
@@ -120,5 +118,4 @@ if gh release view "$tag" >/dev/null 2>&1; then
 ## 关联
 
 - [PUBLISHING.md](PUBLISHING.md) —— 发布流程与版本号判定（本仓唯一发布入口）
-- [../CONTRIBUTING.md](../CONTRIBUTING.md) —— PR 标签与 issue 标题约定
 - [.github/workflows/release-drafter.yml](../.github/workflows/release-drafter.yml) · 组织级 [.github 仓库](https://github.com/dsh-plugin-lab/.github) 的 `.github/release-drafter.yml`
