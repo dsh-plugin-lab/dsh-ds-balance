@@ -41,6 +41,7 @@ const NON_ARTIFACT_FILES = new Set([
   '.node-version',
   'AGENTS.md',
   'package-lock.json',
+  'screenshots.json',
   'vitest.config.ts',
   'vitest.contract.config.ts',
 ])
