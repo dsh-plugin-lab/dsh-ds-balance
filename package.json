@@ -64,7 +64,7 @@
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json && node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.test.json",
-    "test": "npm run build && vitest run",
+    "test": "pnpm run build && vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "lint": "eslint .",

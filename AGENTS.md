@@ -8,7 +8,7 @@
   发布走 [release.yml](.github/workflows/release.yml)（Trusted Publishing，带 provenance）；
   每版的产物一致性（本地 `npm pack` 的 sha1 对 npm 上的 `dist.shasum`）记在**那次 bump 提交**里。
   **本文档此前抄了「已发布 2.1.1」与逐版流水，落后了两版** —— 这就是不抄的理由。
-- `npm run check:release` 当前 0 失败。
+- `pnpm run check:release` 当前 0 失败。
 - 装法只有一条：`dsh plugin --profile <profile> add dsh-ds-balance`（或源码路径）—— 包内声明了 bundle 层，安装器自己会写进 `dsh.profile.bundles`。**不要再手写 patch 行**，见下面的活跃坑。
 - 运行形态：装进某个 dsh profile 的 `node_modules`，由该 profile 的 `dsh.profile.bundles` 装载（bundle 层来自包内的 `cordis.patch.yml`）。
   **跟的是哪条宿主线**：**RC 线**，dist-tag 是 `next`（npm 上**没有 `rc` 这个 tag**）。
@@ -51,13 +51,13 @@
 
 ## 常用命令
 
-- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `prettier --write` + `eslint --fix`（`npx --no-install`，不联网）；CI 只读新增 format:check；全量跑 `pre-commit run --all-files`；临时跳过 `git commit --no-verify`；定义见 [.pre-commit-config.yaml](.pre-commit-config.yaml)
+- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `prettier --write` + `eslint --fix`（`pnpm --config.verify-deps-before-run=false exec`，不联网）；CI 只读新增 format:check；全量跑 `pre-commit run --all-files`；临时跳过 `git commit --no-verify`；定义见 [.pre-commit-config.yaml](.pre-commit-config.yaml)
 
-- `npm run build`：宿主 tsc + 客户端 tsc + esbuild 打包，三步缺一不可
-- `npm run typecheck`、`npm test`
-- `npm run test:contract`：打真实上游的契约测试，要环境里有 `DSH_CI_API_KEY`（专用），缺了回落 `DEEPSEEK_API_KEY`；不进 ci.yml
-- `npm run check:release`：发布态不变量；当前 **0 失败**（`dsh.bundle.patch`、`private`、展示面的 `exports` / `files` 覆盖与 icon 那几条都已就位）
-- `npm run check:declaration`：声明面 —— 只读 `package.json` 的区间 + 问 npm，判「声明的范围还罩不罩得住被跟的那条线」；**不装依赖**，几十秒出结果
+- `pnpm run build`：宿主 tsc + 客户端 tsc + esbuild 打包，三步缺一不可
+- `pnpm run typecheck`、`pnpm test`
+- `pnpm run test:contract`：打真实上游的契约测试，要环境里有 `DSH_CI_API_KEY`（专用），缺了回落 `DEEPSEEK_API_KEY`；不进 ci.yml
+- `pnpm run check:release`：发布态不变量；当前 **0 失败**（`dsh.bundle.patch`、`private`、展示面的 `exports` / `files` 覆盖与 icon 那几条都已就位）
+- `pnpm run check:declaration`：声明面 —— 只读 `package.json` 的区间 + 问 npm，判「声明的范围还罩不罩得住被跟的那条线」；**不装依赖**，几十秒出结果
 - `node scripts/acceptance.mjs`（端到端验收）、`node scripts/compat-swap.mjs check`（现查三条 dist-tag 线）
 - 挂载：`dsh plugin --profile <profile> add <包名或仓库路径>`，然后**重启宿主**。包内声明了 `dsh.bundle.patch`，安装器会把它写进该 profile 的 `dsh.profile.bundles` —— bundle 层只在启动时读。
 - **不要再往 profile 的 `cordis.patch.yml` 手写 insert 行**：那是本插件还没声明 `dsh.bundle` 时的开发期做法，现在两者并存就是双挂载（见活跃坑）。
@@ -68,7 +68,7 @@
 
 本文件与各文档一律不抄会漂的值，要精确值时现查：
 
-- 测试数量、类型检查结果 → `npm test` / `npm run typecheck`，或 [CI](.github/workflows/ci.yml) 的运行记录。
+- 测试数量、类型检查结果 → `pnpm test` / `pnpm run typecheck`，或 [CI](.github/workflows/ci.yml) 的运行记录。
 - 产物体积与文件清单 → `Get-ChildItem lib`。
 - 版本号与依赖范围 → [package.json](package.json)。
 - 宿主兼容范围与客户端注入声明 → `package.json` 的 `engines.dsh` 与 `dsh.client`。
@@ -78,9 +78,9 @@
 ## 验证快照
 
 - 结论一律来自本机实跑或 [CI](.github/workflows/ci.yml)；**数字不在本文档里抄**。
-- 领域 / 服务 / 适配器 / HTTP / 浏览器半边：`npm test` 覆盖 —— 跑它，或看 CI。
-- 产物级：`test/artifacts.test.ts` 在 `lib/` 上断言（`npm test` 自带 build）。
-- 契约级：`npm run test:contract` 打真实上游，要 `DSH_CI_API_KEY`。
+- 领域 / 服务 / 适配器 / HTTP / 浏览器半边：`pnpm test` 覆盖 —— 跑它，或看 CI。
+- 产物级：`test/artifacts.test.ts` 在 `lib/` 上断言（`pnpm test` 自带 build）。
+- 契约级：`pnpm run test:contract` 打真实上游，要 `DSH_CI_API_KEY`。
 - **真机端到端已验**（隔离实例 + 真实 dsh 宿主）：六个端点、`severity` 四档、
   `NO_KEY` / `UPSTREAM_401` / `UPSTREAM_5XX` 三条错误路径、`422` 校验、冷却、配置掩码；
   重启后快照按 `accountTag` 读回、`.salt` 复用、上游不可达降级成 `stale`。
@@ -108,7 +108,7 @@
 - [x] **六张门面图已于第三轮全部重拍**（展示元数据 + 图标落地之后）：`settings-card*.png`、
   `settings-cards-position*.png`、`sidebar-popover*.png` 各两张，第三轮实测的拍法与判据写进了
   [assets/AGENTS.md](assets/AGENTS.md)（侧栏按容器几何裁、长元素不碰 viewport）。
-- [x] 发布前：加回 `dsh.bundle`、去掉 `private` → `npm run check:release` 0 失败
+- [x] 发布前：加回 `dsh.bundle`、去掉 `private` → `pnpm run check:release` 0 失败
 - [x] 六项发布面全部落地（assets / CONTRIBUTING / PUBLISHING / contract 配置 / 3 个 workflow / 3 个 script）→ [落地记录](.agents/notes/2026-09-17-release-surface-landing.md)
   - **后记（2026-10-12）**：`CONTRIBUTING` 那项已**上提到组织级**（三仓同批，本仓不再自带）。本条保留当时的事实。
 - [x] 两张设置卡片截图已从真实界面实拍（中英各一张）→ 重截判据见 [assets/AGENTS.md](assets/AGENTS.md)
@@ -148,7 +148,7 @@
 - **宿主版本可能与 devDeps 错位**：本仓 devDeps 锁在某个宿主编译，实际运行的宿主可能更新。改代码前先跑 `dsh --version` 对比 `package.json` 的 devDeps；错位可能导致编译通过但运行时崩。升级 devDeps 要同步决定 `engines.dsh` 的兼容范围。连带一条：宿主线升级时**宿主包的传递依赖也可能被抬** —— 本仓若把它写死在旧版，包管理器会装出**两份同名包**，类型互不兼容 → 编译报「A 不能赋给 B」而两个路径都是 `node_modules`。判据：报错里出现两个不同层级的 `node_modules`；处置：把本仓那份升到与宿主同源的范围。核验兼容性用**仓库外**的临时目录装目标线宿主包。在仓内建目录的代价是双份的：包管理器把它当 workspace 成员，`add` 会顺带重排本仓 `node_modules`，并往锁文件写一条 **importer** 记录 —— 目录删了记录还在，而**本机安装不带 frozen 校验会静默自愈**，只有 CI 的 frozen 模式才判红（姊妹仓 2026-10-02 三平台齐红，失败在第一步 install）。判据：在锁文件里搜那个目录名；处置：重新解析，别手工编辑锁文件。
 - **`sidebar.footer.action` 的宿主容器是 row flex（宿主遗漏）**：官方 cordis 面板（`packages/extensions/ui-cordis/src/client/`）把根节点写成满宽且不收缩，横排下条目会被挤到 0 宽。我们已用 `:has()` 反选父元素把它改回纵向堆叠 → [决策](.agents/notes/2026-09-17-footer-stack-override.md)。依赖 `:has()` 与该锚点属性稳定。
 - **`dsh plugin` 会把声明了 `dsh.bundle` 的已装包写进 profile 的 `dsh.profile.bundles`**，而 bundle 层与 patch 层的 insert 行**只在启动时读** —— 两条同时存在就是**双挂载**。开发期靠「不声明 `dsh.bundle`」躲开它，发布态不能这么干（包里必须有 bundle 层）。所以装法只能选一种：**`dsh plugin add` 或手写 patch 行，不要都做**。改本机 profile 前先看 `dsh.profile.bundles`。
-- **`link:` 到 profile 外的插件，仓库必须自己装好 peer deps**（`npm install` 会做到）——
+- **`link:` 到 profile 外的插件，仓库必须自己装好 peer deps**（`pnpm install` 会做到）——
   它按**仓库路径**解析 `@deepseek-ai/*`，走不到 profile 的兜底目录；
   少了报 `ERR_MODULE_NOT_FOUND`、插件显示「未运行」。
 - **本地起验证实例前先确认端口空闲**：端口被占时 `dsh` 会以 `EADDRINUSE` 启动失败（webserver 是必需插件，`exit code 1`），**但本插件仍然装载、照常抓数** —— 日志里看着像跑起来了，其实没有可访问的 URL。重启前先查 `Get-NetTCPConnection -State Listen -LocalPort <port>`，或直接换端口。
@@ -159,7 +159,7 @@
 - **换版脚本按「族」工作（2026-10-10）**：声明面是 `||` 并集，`compat-swap` 把区间拆成族、
   按「元组相同」定位要换的那一族、**其余族原样保留**，运算符与上界原样保留；**单族**区间跨元组换线
   仍合法（单族 = 「就承诺这一条线」），**多族**缺目标族时报错停下（不静默新增承诺）。
-  认不出的形状（`*`、`1.x`、`workspace:^`、族内 `||`）仍直接红。自检：`node scripts/compat-swap.mjs selftest`（`npm test` 里也有一条，22 条）。
+  认不出的形状（`*`、`1.x`、`workspace:^`、族内 `||`）仍直接红。自检：`node scripts/compat-swap.mjs selftest`（`pnpm test` 里也有一条，22 条）。
   - **线的参数既收 dist-tag 也收**版本前缀**（如某条旧 RC 族）**：实测**没有任何 dist-tag 指向它**，
     所以巡检那条记录线靠前缀定位族（取该前缀下最高的已发布版本）。
   - **`--only <前缀>`：测某一族时把声明面临时收窄成只有那一族**。为什么必需 —— 并集区间对 npm 的含义是
@@ -171,7 +171,7 @@
     于是换线后 `engines.dsh` 与 23 处依赖必然不一致，[test/redlines.test.ts](test/redlines.test.ts) 的
     「区间与 `engines.dsh` 逐字相同」**每次换线必红**，且红的位置恰好盖住真正的不兼容点（typecheck 仍绿）。
     → [决策记录](.agents/notes/2026-10-05-swap-must-move-engines-dsh.md)
-- **`npm ci` 会执行 `prepare`**：所以本仓库**不声明** `prepare`。声明了的话 CI 的 `npm ci` 会先产出 `lib/`，typecheck 就再也看不到「干净检出」这个状态 —— 那正是刚修掉的一类缺陷（`test/artifacts.test.ts` 在 CI 上 TS2307，本机因产物早就在而常绿）。见 [决策记录](.agents/notes/2026-09-17-prepare-script-decision.md)。
+- **`pnpm install --frozen-lockfile --config.node-linker=hoisted` 会执行 `prepare`**：所以本仓库**不声明** `prepare`。声明了的话 CI 的 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 会先产出 `lib/`，typecheck 就再也看不到「干净检出」这个状态 —— 那正是刚修掉的一类缺陷（`test/artifacts.test.ts` 在 CI 上 TS2307，本机因产物早就在而常绿）。见 [决策记录](.agents/notes/2026-09-17-prepare-script-decision.md)。
 - **写临时探针别用 `os.tmpdir()`**：进程环境为空时它在 Windows 上返回相对路径 `undefined\temp`，会把文件写进工作区，还会让 `robocopy` 自我递归出一棵超 MAX_PATH 的目录树。用 `$env:TEMP` 或显式绝对路径，用完即删。
 - **Agent 的 `write` 工具对「自己刚删掉的文件」会拒绝覆盖**（它缓存里那个文件还在）。换个路径，或用 Node 的 `fs.writeFileSync` 直接写。
 - **整份文件被别的文档覆盖：三条文档红线一条都不会响**（本轮真发生过）。`docs/UI-HANDOFF.md` 被整份换成了另一个文件的内容（193 行 → 734 行），而「文档链接」「不抄实测值」两条仍然全绿 —— 文件还在、格式合法、链接可解析、没有会漂的值，**只有职责内容消失了**。
@@ -179,13 +179,13 @@
   - 手工判据：`git diff --stat` 里**行数剧变**（不是几十行而是几百行）就是可疑信号，别只看测试绿。
   - 成因：把某个 skill / 文档的**整份内容**读进上下文后，写入时误当成目标文件的内容。**改文档时用定点 `edit`，不用整份 `write`** —— 后者会把「当前上下文里那份东西」整体落盘。
 - **提交前先确认自己在哪个分支**：本轮两次把该走 PR 的改动直接提到了 `main`（第二次靠 `--force-with-lease` 回滚重来）。`git branch --show-current` 应当与「这次改动要不要 PR」的判断一致 —— 纯文档措辞可 admin bypass 直提，其余走 PR（理由：红线要在 CI 独立环境跑一遍，且 Release Drafter 只读 PR）。
-- **`package-lock.json` 的根条目会漏 `peerDependencies`**：`npm ci` 不校验它，所以这种漂移能一路绿到底。改完 peer 之后跑一次 `npm install --package-lock-only` 让 lockfile 对齐清单。
+- **`pnpm-lock.yaml` 不记根包自身的 `peerDependencies`**：frozen 安装不校验它，所以这种漂移能一路绿到底。改完 peer 之后跑一次 `pnpm install` 让锁文件对齐清单。
 - **跨字段约束宿主侧已经拦不住 → [settings 规则层](src/client/settings/AGENTS.md)**：登记接缝被删之后，
   「告急低于预警」只剩消费侧回落与 `POST /api/v1/config` 的写入侧先验两道。**官方 Plugins 页那条写路径拦不住**，
   前端置灰保存只是体验。相关决策见[本轮记录](.agents/notes/2026-09-22-settings-seam-migration.md)。
 - **配置改动不会重新挂载宿主半边**：11 个字段全是 `.volatile()`，Loader 只把新值提交进引用并发一次
   `loader/volatile-update`。所以「改了配置要重启」是错的，「改了**代码**要重启」才是真的 ——
-  而**只改浏览器半边时连重启都不需要**：profile 用 `link:` 挂绝对路径，`npm run build` 出来的
+  而**只改浏览器半边时连重启都不需要**：profile 用 `link:` 挂绝对路径，`pnpm run build` 出来的
   `lib/client.js` 就是宿主读的那一份，HMR 一轮询即换（换不到就刷新页面）。
 - **插件仓不在官方那条材质门禁的覆盖里**：宿主 `ui-theme/tests/elevation-styles.client.spec.ts` 只扫官方仓的
   `packages/`。所以「菜单填充必须配 `backdrop-filter`」这类约束**在插件侧没有任何自动保护** ——

@@ -31,12 +31,11 @@
 | 配置文件 | 在组织级 [.github 仓库](https://github.com/dsh-plugin-lab/.github) 的 `.github/release-drafter.yml`（本仓不自带） |
 | 触发 workflow | 已就位（[../.github/workflows/release-drafter.yml](../.github/workflows/release-drafter.yml)） |
 | 草稿 tag | `next`（滚动名，见下「为什么不是 `v<版本>`」） |
-| **草稿正文是否接入发布流程** | **否** —— `release.yml` 仍用 `--generate-notes`，本批**没有**改它 |
-| 下一步 | 让草稿积累几笔 PR 合并内容后，再决定要不要让发布脚本读它（改 `release.yml` 是独立任务） |
+| **草稿正文是否接入发布流程** | **是** —— `release.yml` 读 `next` 草稿作正文，读不到或读空才回落 `--generate-notes` |
+| 发完草稿是否清理 | **是** —— 只删 tag 不以 `v` 开头的那一个，且 `--cleanup-tag=false` |
 
-**为什么不一步到位**：草稿正文要接进发布脚本，就得动 `release.yml` 那条 `gh release create` ——
-而 `test/redlines.test.ts` 对它有逐字形状断言（见 [PUBLISHING.md](PUBLISHING.md)）。
-先让草稿跑起来，确认真能产出内容，再改那条断言不迟。
+**正文两级的分工**（详见 [PUBLISHING.md](PUBLISHING.md)）：草稿里有条目就用它；读到了但没有条目是
+**正常情况**（本轮没有带标签的 PR）；**读不到是配置坏了**，那一步会发 `::warning::`，别当成正常。
 
 ## 标签映射
 
@@ -90,6 +89,18 @@
 
 （若哪天出现「不影响用户但确实该写进正文」的改动，那说明 PR 粒度判错了，
 该改的是那次改动的走法，不是给草稿加一条 commit 解析路径。）
+
+## 清洗草稿正文：按 action 名，不抄提示语
+
+发布流程读走草稿正文时会把末尾那句「未发布」的提示删掉 —— 它在正式 Release 里是错的。
+**删法是按 action 名匹配那一整行**（`sed '/Release Drafter/d'`），不抄那句提示语的全文。
+
+本仓曾经抄的是**中文全文**，而组织仓模板里那一句早已改成英文 —— 于是一个模式都匹配不上，
+「…not published…」原样进了正式 Release；而判据取的是子串「Release Drafter」，那个子串还在，
+**所以测试照样绿**。这就是那条 sed 静默失效的现场。
+
+现在 [test/redlines.test.ts](../test/redlines.test.ts) 判的是「按什么删」而不是「删了没有」，
+抄全文那种写法过不了。
 
 ## 为什么草稿 tag 是 `next` 而不是 `v<版本>`
 

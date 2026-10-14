@@ -50,7 +50,7 @@ const CRITERION = {
   swap:
     'Swapping the `@deepseek-ai/dsh-*` ranges onto the line must still typecheck and pass the full test ' +
     'suite, and `compat-swap.mjs verify` must confirm the install actually landed on the line. ' +
-    '`npm install` can fail while `node_modules` stays on the old versions, and the tests then report ' +
+    'The install can fail while `node_modules` stays on the old versions, and the tests then report ' +
     'the opposite of the truth.',
 }
 

@@ -4,7 +4,7 @@ import { CONTRACT_KEY_VARS, contractKeyMissingMessage, resolveContractKey } from
 /**
  * 契约测试的凭据解析 —— 纯函数，不发任何请求。
  *
- * 它被日常 `npm test` 收（不匹配 `contract-live-*`，所以不是契约测试的一部分），
+ * 它被日常 `pnpm test` 收（不匹配 `contract-live-*`，所以不是契约测试的一部分），
  * 这样「本地能不能跑契约测试」这件事不必等到真打上游才发现。
  */
 

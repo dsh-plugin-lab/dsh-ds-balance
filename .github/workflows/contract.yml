@@ -33,13 +33,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
       # 缺 secret 时说清楚是哪一步缺的，别让失败信息退化成测试里的那句「缺 DSH_CI_API_KEY」。
       - name: Verify the repository secret is configured
@@ -54,4 +59,4 @@ jobs:
       - name: Contract test against the real upstream
         env:
           DSH_CI_API_KEY: ${{ secrets.DSH_CI_API_KEY }}
-        run: npm run test:contract
+        run: pnpm run test:contract

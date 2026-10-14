@@ -3,9 +3,9 @@ import { defineConfig } from 'vitest/config'
 // 契约测试的独立入口。
 //
 // 与日常 vitest.config.ts 分开的原因：它打真实 DeepSeek 上游，要真实凭据。
-// CI 不跑它（ci.yml 只跑 npm test）；由 contract.yml 每周一次，或本机手动：
+// CI 不跑它（ci.yml 只跑 pnpm test）；由 contract.yml 每周一次，或本机手动：
 //
-//   npm run test:contract
+//   pnpm run test:contract
 //
 // 跑之前环境里要有 DSH_CI_API_KEY（契约巡检的专用 key；CI 上取自同名仓库 secret）；
 // 只有本机日常那把 DEEPSEEK_API_KEY 也能跑 —— 解析顺序在 test/contract-key.ts。

@@ -60,8 +60,8 @@ The balance is read directly from the official DeepSeek API, not estimated from 
 
 3. Start (or restart) `dsh --profile web`; the balance entry appears at the bottom of the sidebar.
 
-From source: `git clone`, then `npm install && npm run build`, then `dsh plugin --profile web add "$PWD"` — the same restart applies.
-That `npm install` cannot be skipped: under a path install the repository supplies its own dependencies, and missing them makes the plugin show as "not running".
+From source: `git clone`, then `pnpm install && pnpm run build`, then `dsh plugin --profile web add "$PWD"` — the same restart applies.
+That `pnpm install` cannot be skipped: under a path install the repository supplies its own dependencies, and missing them makes the plugin show as "not running".
 
 ## What it shows
 

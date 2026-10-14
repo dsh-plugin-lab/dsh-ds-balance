@@ -1,7 +1,7 @@
 # src/ — 源码手册
 
 - 职责：插件两个半体的源码。
-- 变更影响路由：改这里的对外行为 → 同步根 [README.md](../README.md) 与 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)；宿主半边改完必须重新 `npm run build` 才被加载。
+- 变更影响路由：改这里的对外行为 → 同步根 [README.md](../README.md) 与 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)；宿主半边改完必须重新 `pnpm run build` 才被加载。
 
 ## 两个半体
 

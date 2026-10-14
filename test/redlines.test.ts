@@ -60,18 +60,39 @@ describe('依赖分层', () => {
 
 describe('锁文件', () => {
   it('resolved 必须指向官方源', () => {
-    // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患），而且 `npm ci` 可能因 peer 未同步而失败。
-    // 这条以前只写在 docs/PUBLISHING.md 的散文里 —— 规则住在文字里就没人执行，
-    // 所以 2026-09-20 落成断言（当时 balance 实测 129/131 条走 registry.npmmirror.com）。
-    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
-      packages?: Record<string, { resolved?: string }>
-    }
-    const offenders = Object.entries(lock.packages ?? {})
-      // 只看 http(s) 来源；file:/link:/git 之类本就不是包的公开源。
-      .filter(([, meta]) => meta.resolved?.startsWith('http'))
-      .filter(([, meta]) => !meta.resolved!.startsWith('https://registry.npmjs.org/'))
-      .map(([name, meta]) => `${name || '(root)'} → ${new URL(meta.resolved!).host}`)
-    expect(offenders, `这些包的 resolved 不指向官方源：\n${offenders.join('\n')}`).toEqual([])
+    // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患）。这条以前只写在 docs/PUBLISHING.md 的散文里 ——
+    // 规则住在文字里就没人执行，所以 2026-09-20 落成断言（当时 balance 实测 129/131 条走
+    // registry.npmmirror.com）。
+    //
+    // 迁到 pnpm 之后判据的**形状变了但口径没变**：pnpm-lock 把 tarball 的完整性摘要放在
+    // `resolution: {integrity: …}`，不再有 `resolved: <url>` 这一层。所以这里查的是**文件里出现的
+    // 每一个 http(s) URL**：pnpm 锁定的是 integrity 而非来源地址，因此只要出现地址就该是官方源，
+    // 出现别处就是有人在镜像上生成过这个锁文件。
+    const lock = readFileSync('pnpm-lock.yaml', 'utf8')
+    const hosts = [
+      ...new Set(
+        [...lock.matchAll(/https?:\/\/[^\s'"<>\\)\]]+/g)].map((match) => {
+          try {
+            return new URL(match[0]).host
+          } catch {
+            return match[0]
+          }
+        }),
+      ),
+    ].filter((host) => !host.startsWith('registry.npmjs.org'))
+    expect(hosts, `锁文件里出现了非官方源的地址：\n${hosts.join('\n')}`).toEqual([])
+  })
+
+  it('pnpm-lock.yaml 是唯一的锁文件', () => {
+    // 跨仓判据：全族只有 pnpm 一条路。两份锁文件同时存在时，CI 装的那棵与本机装的那棵可以不是同一棵，
+    // 而「装出来能跑」不会报错 —— 那正是要在这里拦的情况。
+    //
+    // ⚠️ 这里刻意**拼出**那个名字而不是写进 package.json / .gitignore 的替换表里：本文件刚被一次
+    // 批量改名扫过（package-lock.json → pnpm-lock.yaml），把它写成字面量的话，这条断言会被改成
+    // 「pnpm-lock.yaml 不该存在」而永远红 —— 一个自我否定的守卫比没有守卫更坏。
+    const npmLock = ['package', 'lock.json'].join('-')
+    expect(existsSync(npmLock), `${npmLock} 与 pnpm-lock.yaml 不能共存`).toBe(false)
+    expect(existsSync('pnpm-lock.yaml'), 'pnpm-lock.yaml 必须入库').toBe(true)
   })
 })
 
@@ -153,11 +174,17 @@ describe('发布流程', () => {
     expect(bumpCalls('        npm --no-git-tag-version version prerelease')).toEqual([
       '第 1 行：npm --no-git-tag-version version prerelease',
     ])
-    expect(bumpCalls('run: npm ci && npm version patch')).toEqual(['第 1 行：npm version patch'])
+    expect(
+      bumpCalls(
+        'run: pnpm install --frozen-lockfile --config.node-linker=hoisted && npm version patch',
+      ),
+    ).toEqual(['第 1 行：npm version patch'])
     // 正常的发布步骤、以及提示文案里的那串字，都不该被误伤。
-    expect(bumpCalls('run: npm ci')).toEqual([])
+    expect(bumpCalls('run: pnpm install --frozen-lockfile --config.node-linker=hoisted')).toEqual(
+      [],
+    )
     expect(bumpCalls('run: npm publish --provenance --tag "$tag"')).toEqual([])
-    expect(bumpCalls('run: npm run build && npm test')).toEqual([])
+    expect(bumpCalls('run: pnpm run build && pnpm test')).toEqual([])
     expect(
       bumpCalls('echo "bump with: npm version <patch|minor|major> --no-git-tag-version"'),
     ).toEqual([])
@@ -252,6 +279,102 @@ describe('发布流程', () => {
     // 拿一份「读草稿但读不到时静默」的假 workflow，warning 那条必须不命中。
     const silent = 'draft="$(gh release view next --json body --jq .body)"\n'
     expect(silent).not.toMatch(/warning::读不到 Release Drafter 草稿/)
+  })
+
+  /**
+   * 发完**删草稿**。
+   *
+   * 为什么单列一条：Release Drafter 以「最新的正式版」作分界线，它自己不认哪个草稿被消费过。
+   * 不删的后果不是「草稿空白」，而是**草稿停在旧分界** —— 下一版读到的是上一批的正文，
+   * 而草稿看上去「有内容」。属静默错。
+   *
+   * 只删草稿、且必须显式关掉连带删 tag：`gh release delete <tag>` 默认连 tag 一起删，
+   * 而 tag 是守卫 `git describe --match 'v[0-9]*'` 读的东西，删掉它等于**下一次发版的基线没了**。
+   */
+  it('发完删草稿，且不连带删掉 tag', () => {
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+    expect(workflow, '没有删除草稿的步骤').toContain('gh release delete')
+    expect(workflow, '删草稿时没有关掉 --cleanup-tag，会连带删掉守卫依赖的 tag').toContain(
+      '--cleanup-tag=false',
+    )
+    // 删除必须按「isDraft 且 tag 不以 v 开头」圈定，不是按标题、也不能碰正式版。
+    expect(workflow, '删草稿时没有限定 isDraft / 非 v 前缀').toMatch(/select\(\.isDraft\)/)
+    expect(workflow, '删草稿时没有排除 v 前缀的 tag').toMatch(/select\(startswith\("v"\) \| not\)/)
+    // dry-run 不建正式版，此时删草稿会让那批正文永久丢失。
+    expect(workflow, '删草稿的条件没有带上 !inputs.dry-run').toMatch(
+      /if:.*!inputs\.dry-run.*steps\.notes\.outputs\.source == 'draft'/,
+    )
+  })
+
+  /**
+   * 手动与 tag 两个入口，以及 tag 触发带的两道闸。
+   *
+   * 这两条漏掉时都**不报错**，只是下一次 tag 发布会以一个离真相很远的理由变红：
+   * - 基线没排除正在发的那个 tag → `describe` 解析出它自己、`<tag>..HEAD` 恒空 →
+   *   一次完全正常的发布被判成「没有可发布的内容」。
+   * - 「只接受 main」没带事件守卫 → tag 触发时 `github.ref` 是 `refs/tags/...`，每次都红。
+   */
+  it('手动与 tag 两个入口都在，tag 触发的两道闸也在', () => {
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+    expect(workflow, '没有手动触发入口').toMatch(/workflow_dispatch:/)
+    expect(workflow, '没有 tag 触发入口').toMatch(/tags:\s*\n\s*-\s*'v\[0-9\]\*'/)
+
+    // ① 基线排除正在发的 tag。
+    expect(workflow, '守卫基线没有排除正在发的 tag').toMatch(
+      /--exclude=\$\{\{\s*github\.ref_name\s*\}\}/,
+    )
+    // ② 「只接受 main」带事件守卫。
+    expect(workflow, '「只接受 main」的判定没有事件守卫').toMatch(
+      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
+    )
+    // ③ tag 名与清单一致那道闸。
+    expect(workflow, '没有 tag/清单版本一致性那道闸').toMatch(
+      /Verify the pushed tag matches the manifest version/,
+    )
+  })
+
+  it('上面那两条有牙齿（拿缺了这两样的写法比对，必须不满足）', () => {
+    const noExclude = "          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*')\n"
+    expect(noExclude).not.toMatch(/--exclude=\$\{\{\s*github\.ref_name\s*\}\}/)
+
+    const noEventGuard = "        if: github.ref != 'refs/heads/main'\n"
+    expect(noEventGuard).not.toMatch(
+      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
+    )
+    // 真文件里的那行必须满足 —— 判据不是「永远为真」。
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+    expect(workflow).toMatch(
+      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
+    )
+  })
+
+  /**
+   * 清洗草稿正文的那句 sed —— 本仓曾经**静默失效**过。
+   *
+   * 原来抄的是提示语的**中文全文**，而组织仓模板里那一句早已改成英文。于是两个模式一个都匹配
+   * 不上，「…not published…」原样进了正式 Release；而判据取的是子串「Release Drafter」，
+   * 那个子串还在，所以**测试照样绿**。
+   *
+   * 所以这里判的不是「删了没有」，而是**按什么删**：按 action 名匹配那一整行，中英文都吃。
+   */
+  it('清洗草稿按 action 名整行匹配，而不是抄提示语的全文', () => {
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
+    // 只看**会执行的行**：注释里提到 sed 与 Release Drafter 的话不算数 ——
+    // 否则这段解释它为什么这么写的注释本身就会把断言判红。
+    const sedLines = workflow
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('#'))
+      .filter((line) => /\bsed\b/.test(line) && line.includes('Release Drafter'))
+    expect(sedLines.length, '找不到清洗草稿正文那行 sed').toBeGreaterThan(0)
+    for (const line of sedLines) {
+      expect(
+        line,
+        '清洗草稿不能抄提示语的全文（那句话会被改写）—— 按 action 名 `/Release Drafter/d` 删整行',
+      ).toMatch(/sed '\/Release Drafter\/d'/)
+    }
+    // 反向控制：抄中文全文的那种写法必须不满足。
+    const chineseFull = "sed '/由 Release Drafter 自动汇总草稿/d; /gh workflow run release.yml/d'"
+    expect(chineseFull).not.toMatch(/sed '\/Release Drafter\/d'/)
   })
 })
 
@@ -1240,7 +1363,7 @@ describe('文档链接', () => {
  *
  * **为什么需要这条**：上面两条文档红线只查「链接指不指得到」与「有没有抄实测值」，
  * 而**整份文件被别的文档覆盖**时两者都仍然成立 —— 文件还在、格式合法、链接可解析、
- * 没有会漂的值，于是 `npm test` 全绿，而那份文档的**职责内容已经消失**。
+ * 没有会漂的值，于是 `pnpm test` 全绿，而那份文档的**职责内容已经消失**。
  * 本轮真发生过一次：`docs/UI-HANDOFF.md` 被整份换成了另一个文件的内容（193 行 → 734 行），
  * 三条红线一条都没响，靠人眼看行数才发现。标题是这类损坏最廉价、最稳定的指纹。
  *

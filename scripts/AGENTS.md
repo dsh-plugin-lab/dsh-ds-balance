@@ -12,4 +12,4 @@ scripts/ 特有约束：
 - **esbuild 的 CSS Modules 必须显式开 `loader: { '.css': 'local-css' }`**，否则 `import css from './x.module.css'` 拿到 `{}`、类名全是 `undefined`。
 - **esbuild 会把 CSS 抽成独立文件，而 DSH 只服务 `lib/client.js`**：样式必须在构建后内联回 factory，否则界面渲染出来但一条样式都不生效。
 - **`src/client.ts(x)` 会与浏览器信封的输出路径 `lib/client.js` 抢文件**：历史上导致宿主启动 SyntaxError。`build-client.mjs` 开头有守卫，别删。
-- 符号链接安装下 `npm run build` 直接写线上：未验证的构建会立刻影响正在使用的界面。
+- 符号链接安装下 `pnpm run build` 直接写线上：未验证的构建会立刻影响正在使用的界面。

@@ -1,13 +1,42 @@
-# 发布：手动触发，本仓库唯一的发布入口。
+# 发布：手动触发 + 推 tag，两个等价入口，进的是同一个 job。
+#   ① 手动 —— Actions → Release → Run workflow（或 `gh workflow run release.yml`）。
+#   ② 推 tag —— `git push origin v<版本>`。
 #
-# 认证用 npm Trusted Publishing（OIDC），没有 NPM_TOKEN 这种东西。
-# 代价是必须在 npmjs.com 上为本包配一次 trusted publisher（见 docs/PUBLISHING.md），
-# 收益是仓库里不存任何长期凭据，代币由 GitHub 现签、用完即废。
+# **输入只有 `dry-run`**（本仓还有那个检查链上的选项）；版本号来自 package.json，档位在本地 bump 时定。
 #
-# 顺序是全有或全无：先证明产物是对的，再发。任何一步红了，后面都不会跑。
+# 改本文件后**必须手动 dispatch 实跑一次**：PR 上的 CI 只跑 ci.yml，动 release.yml 的 PR
+# 就算绿勾也不代表发布链路验过。
 #
-# 预发布：版本号里带预发布段（npm version premajor --preid=alpha）时，会发到**同名 dist-tag**，
-# latest 保持不动；不带预发布段时照旧发 latest。
+# 顺序是全有或全无：先发布成功，才打 tag 与建 GitHub Release；发布失败时远端零残留。
+#
+# 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（tag / Release）。
+#
+# **tag 触发带一道自己的闸**：tag 名必须等于 `v` + package.json 里的版本号，不一致直接红 ——
+# 否则会出现「tag 是 v2.3.0、发出去的是 2.2.0」这种最难查的错位，而 npm 的版本号不可覆盖。
+# 手动触发没有这道闸（它的语义是「发清单里那个号」，tag 由流程补建）。
+#
+# **发版说明读 Release Drafter 草稿**（tag `next`），读不到或读空才回落 `--generate-notes`，
+# 且**读不到必须发 warning** —— 那是配置坏了，与「本轮没有带标签的 PR」不是一回事。
+# 正文取走之后**删掉草稿**，否则下一版会读到这一批的正文。
+#
+# **版本驱动：本 workflow 不 bump 版本。** 发布的就是 package.json 里那个号 —— 版本号是发布**之前**
+# 的独立一步。理由：界面上的版本 tag 就是 package.json 里那个号，workflow 自己 bump 会让工作树
+# 永远停在「上一个已发布版本」。这条由 `pnpm run check:release` 的「发布流程不改写版本号」钉住。
+#
+# 预发布：版本号里带预发布段（2.0.0-alpha.2）时，**按版本自己那段**发到同名 dist-tag（alpha），
+# latest 保持不动；不带预发布段时发默认 latest。判据是**结果版本**，不是任何输入参数，
+# 所以 publish 与 GitHub Release 两步读同一个输出，不会各判各的。
+#
+# **tag 名 = v + package.json 里的版本号**（v2.3.1）。前缀是**显式补**的，不从值里推 ——
+# `npm version` 的输出自带 v，而 package.json 里没有；换来源时形状变了会把 tag 名带歪，
+# 而守卫靠 git describe --match 'v[0-9]*' 看 tag，**它看不见不带 v 的 tag**（2026-09-22 真踩过）。
+#
+# 防噪音：bump 之前先跑 scripts/release-guard.mjs —— 上个 tag 以来若只剩非产物改动
+# （文档 / 测试 / CI / 工具脚本），说明没有可发布的行为变化，直接红。
+#
+# 认证：npm Trusted Publishing（OIDC），全程不传任何 token。
+# npm 自 2027-01 起不再接受 bypass-2FA token 直接发布，故不留长期凭据。
+# 代价：在 npmjs.com 上为本包配一次 Trusted Publisher（仓库 / workflow 文件名 / environment 三者要对上）。
 name: release
 
 on:
@@ -17,6 +46,9 @@ on:
         description: 只做检查与打包，不真的发布，也不打 tag
         type: boolean
         default: false
+  push:
+    tags:
+      - 'v[0-9]*'
 
 permissions:
   contents: read
@@ -31,53 +63,79 @@ jobs:
       contents: write # 发布成功后打 tag 用
       id-token: write # Trusted Publishing 的 OIDC 换发
     steps:
+      # 手动触发只接受 main；tag 触发天然指向某个提交，由下面那道 tag/清单一致性闸来管。
+      # ⚠️ 这道判定**必须带 github.event_name 守卫**：不带的话 tag 触发时 github.ref 是
+      # refs/tags/...，每一次 tag 发布都红 —— 而且红的原因离真正的原因很远。
+      - name: Verify this dispatch came from main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::发版只能从 main 触发，当前 ref 是 ${{ github.ref }}"
+          exit 1
+
       # release-guard 要 diff「上个 tag..HEAD」，浅克隆里没有 tag。
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
           # Trusted Publishing 要求 npm 走官方 registry 换 OIDC，别指向镜像。
           registry-url: https://registry.npmjs.org
 
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
-      # 版本号写在两处：package.json 决定发布号，package-lock.json 决定 npm ci 装的树。
-      - name: Verify the lockfile version matches package.json
-        run: |
-          pkg=$(node -p "require('./package.json').version")
-          lock=$(node -p "require('./package-lock.json').version")
-          if [ "$pkg" != "$lock" ]; then
-            echo "::error::package-lock.json 是 $lock，package.json 是 $pkg"
-            echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
-            exit 1
-          fi
+      # 版本号只写在 package.json 一处：pnpm-lock v9 不记录根包自身的版本，所以 npm 仓那种
+      # 「lockfile 版本 == 清单版本」的交叉核对在本仓不存在对应物。「忘了 bump」由下面那道
+      # 「该版本已在 npm 上」的幂等判据兜住（报的是已存在，而不是发一个内容相同的新版本出去）。
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       # 发布态不变量：dsh.bundle 加回来了吗、private 去掉了没有。
       - name: Release preconditions
-        run: npm run check:release
+        run: pnpm run check:release
+
+      # tag 触发时：tag 名必须就是 v + 清单里的版本号。
+      # 没有这道闸就会出现「tag 是 v2.3.0、实际发的是 2.2.0」，而 npm 的版本号不可覆盖。
+      - name: Verify the pushed tag matches the manifest version
+        if: github.event_name == 'push'
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          got="${{ github.ref_name }}"
+          if [ "$got" != "$want" ]; then
+            echo "::error::推的是 $got，而 package.json 是 $want —— tag 与清单版本必须一致"
+            exit 1
+          fi
+          echo "$got 与清单一致，继续。"
 
       # 产物没变就不该发版 —— 发了等于制造一个内容相同的新版本号。
       # 首次发版还没有任何 tag，这一步自动跳过。
+      #
+      # 基线要排掉正在发的那个 tag：tag 触发时 HEAD 就是被 tag 的提交，不排除的话
+      # `describe` 解析出它自己，`<tag>..HEAD` 恒空 —— 一次完全正常的发布被判成
+      # 「没有可发布的内容」。dispatch 触发时 tag 还没建，这个 --exclude 是空操作。
       - name: Release guard
         run: |
-          previous=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          exclude=""
+          if [ "${{ github.event_name }}" = "push" ]; then exclude="--exclude=${{ github.ref_name }}"; fi
+          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' $exclude 2>/dev/null || true)
           if [ -z "$previous" ]; then
-            echo "没有历史 tag（首次发版），跳过守卫。"
+            echo "没有更早的 tag（首次发版），跳过守卫。"
             exit 0
           fi
           echo "对比 $previous..HEAD"
-          git diff --name-only "$previous"..HEAD | node scripts/release-guard.mjs
+          git diff --name-only "$previous..HEAD" | node scripts/release-guard.mjs
 
       # 幂等：补跑一条已经发成功的流水线时，不该在 npm 那里撞一个 403 就停住。
       - name: Probe whether this version is already on npm
@@ -124,9 +182,8 @@ jobs:
 
       # 正文来源两级：**草稿 → `--generate-notes` 回落**。
       #
-      # 草稿由 Release Drafter 维护（tag 是滚动名 `next`，永不与 `v<版本>` 相撞 ——
-      # 所以上面那个 `gh release view "$tag"` 的存在性判断不会命中草稿）。
-      # 草稿为空（无 PR 的直提、或本轮没有带标签的 PR）时回落 GitHub 自动生成。
+      # 草稿由 Release Drafter 维护（配置在组织仓，本仓不自带；tag 是滚动名 `next`，
+      # 永不与 `v<版本>` 相撞 —— 所以下面那个 `gh release view "$tag"` 的存在性判断不会命中草稿）。
       #
       # **必须断言「草稿真的被读到了吗」**：读不到草稿与「草稿为空」都会走回落，
       # 但前者是**配置坏了**（tag 改名、action 没跑、权限不足），后者是**正常情况**。
@@ -138,11 +195,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           draft="$(gh release view next --json body --jq '.body' 2>/dev/null || true)"
-          # 草稿正文里那句「未发布」的标记由 .github/release-drafter.yml 的 template 产出；
-          # 用它判「这是草稿，不是别的什么」比判非空更稳（非空可能是一份旧的正式 Release）。
+          # 用「Release Drafter」这个词判「这是草稿，不是别的什么」：判非空不够稳，
+          # 因为一份旧的正式 Release 也是非空的。
           if printf '%s' "$draft" | grep -q 'Release Drafter'; then
-            # 去掉草稿末尾那句「未发布」提示 —— 正式 Release 里那句话是错的。
-            printf '%s\n' "$draft" | sed '/由 Release Drafter 自动汇总草稿/d; /gh workflow run release.yml/d' > /tmp/notes.md
+            # 清理**按 action 名匹配那一整行**，不抄提示语的全文：那句话归组织仓的模板所有，
+            # 随时会被改写。原来这里抄的是中文全文，而模板那句早已改成英文 —— 于是一句都匹配
+            # 得上零句，「not published」原样进了正式 Release，而判据仍取子串
+            # 「Release Drafter」，所以测试照样绿。这条 sed 就是那次静默失效的现场。
+            printf '%s\n' "$draft" | sed '/Release Drafter/d' > /tmp/notes.md
             # 草稿可能只有标题没有条目（无 PR 时）：那种仍算「读到但为空」，走回落。
             if [ -n "$(grep -E '^[-*] ' /tmp/notes.md || true)" ]; then
               echo "source=draft" >> "$GITHUB_OUTPUT"
@@ -176,4 +236,28 @@ jobs:
             else
               gh release create "$tag" --title "$tag" $flags --generate-notes
             fi
+          fi
+
+      # 正文取走之后**必须把草稿让位**，否则下一次发版会读到上一批的正文。
+      #
+      # Release Drafter 以「最新的正式版」作分界线，它自己不认哪个草稿被消费过。
+      # 不删的后果不是「草稿空白」，而是**草稿停在旧分界**（实测：某版发版后 `next` 的正文仍停在
+      # 那一版之前的那一批）—— 正文是**上一批的**，而表面上看草稿「有内容」，属静默错。
+      #
+      # `if` 必须与上面 `Create` 那条一致（含 `!inputs.dry-run`）：dry-run 不建任何正式版，
+      # 若此时删掉草稿，那批正文就**永久丢了**。且只在正文真的取自草稿时才删 ——
+      # 走了回落就不该动它。
+      #
+      # 只删 tag 不以 `v` 开头的那一个草稿：不按标题匹配，也不碰任何 `v<版本>` 的正式版
+      # （`gh release delete <tag>` 默认连带删 tag，这里显式关掉）。
+      - name: Retire the drafter's next draft
+        if: steps.probe.outputs.exists == 'false' && !inputs.dry-run && steps.notes.outputs.source == 'draft'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          draft_tag="$(gh release list --limit 30 --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft) | .tagName] | map(select(startswith("v") | not)) | .[0] // ""')"
+          if [ -n "$draft_tag" ]; then
+            gh release delete "$draft_tag" --yes --cleanup-tag=false
+            echo "已删除草稿 $draft_tag（下一批合并后 Release Drafter 会重建它）"
           fi

@@ -7,22 +7,27 @@
 
 逐条跑，全绿才继续。任何一条红了就停下，不要绕过。
 
-- `npm run check:release` —— 发布态不变量：`dsh.bundle` 加回来了吗、`private` 去掉了吗。
-- `npm run typecheck` 与 `npm test`。
+- `pnpm run check:release` —— 发布态不变量：`dsh.bundle` 加回来了吗、`private` 去掉了吗。
+- `pnpm run typecheck` 与 `pnpm test`。
 - `node scripts/acceptance.mjs` —— 打真实上游的端到端验收，需要环境里有 `DEEPSEEK_API_KEY`（**插件日常继承的那把**，不是契约巡检的专用 key）。
 - **`git rev-parse origin/main` 必须等于 `git rev-parse HEAD`** —— 工作流跑的是**远端**那份代码。
   **没 push 就没有可发的东西**：守卫判的是「上个 tag 到远端 HEAD 之间有没有改动」，而远端上那个区间是空的，
   它会以「没有可发的」红掉（2026-09-22 就是这么撞的：本地领先 11 个提交、远端还停在 `v2.0.0-alpha.1` 那个提交上）。
   **先 push，再 dispatch。**
 - `git diff --name-only <上个 tag>..HEAD | node scripts/release-guard.mjs` —— 产物到底变没变。
-- 按下面的判定链定档，然后 `npm version <patch|minor|major> --no-git-tag-version`。
-  这一步会同时改 `package.json` 与 `package-lock.json`；只手工改前者会被 CI 拦下。
-  **版本号其实写在三处**：还有 [src/version.ts](../src/version.ts) 的 `PLUGIN_VERSION`（响应里逐条回传的线上版本常量）。
-  `npm version` **不会碰它** —— 忘了改会被 `test/version.test.ts` 拦下；本机 `npm test` 能提前发现，别等 CI 红。
+- 按下面的判定链定档，然后 `pnpm version <patch|minor|major>`。
+  这一步会同时改 `package.json` 与 `pnpm-lock.yaml`。
+  **版本号其实写在两处**：还有 [src/version.ts](../src/version.ts) 的 `PLUGIN_VERSION`（响应里逐条回传的线上版本常量）。
+  `pnpm version` **不会碰它** —— 忘了改会被 `test/version.test.ts` 拦下；本机 `pnpm test` 能提前发现，别等 CI 红。
 
 ## 发版流程
 
-唯一入口是 [release.yml](../.github/workflows/release.yml)，手动触发。
+入口是 [release.yml](../.github/workflows/release.yml)：**手动触发或推 `v<版本>` tag，两条等价**，
+进的是同一个 job。
+
+tag 触发带一道自己的闸：**tag 名必须等于 `v` + `package.json` 里的版本号**，不一致直接红 ——
+否则会出现「tag 是 v2.3.0、发出去的是 2.2.0」，而 npm 的版本号不可覆盖。手动触发没有这道闸
+（它的语义是「发清单里那个号」，tag 由流程补建）。
 
 ### bump 是发布**之前**的独立一步，workflow 不 bump
 
@@ -32,36 +37,42 @@
 只要发布流程自己改版本，工作树就永远停在「上一个已发布版本」—— 截图必然拍出旧号
 （2026-09-22 zhihu 那一轮就是这么翻的车）。所以：
 
-- bump 在维护者机器上跑（`npm version <tier> --no-git-tag-version`，见上一节），**提交之后**才谈截图与发布；
+- bump 在维护者机器上跑（`pnpm version <tier>`，见上一节），**提交之后**才谈截图与发布；
 - `release.yml` **只发不 bump**：它读现成的版本号、按结果版本推导 dist-tag（带预发布段 → 同名 dist-tag，`latest` 不动）；
-- 这条不变量**已落成红线**：`release.yml` 里不得出现 `npm version <tier>` 这类调用（带反向控制），
+- 这条不变量**已落成红线**：`release.yml` 里不得出现 `pnpm version <tier>` 这类调用（带反向控制），
   见 [test/redlines.test.ts](../test/redlines.test.ts) 的「发布流程」一组。
 
 推论：**发一个版本 = 一次 bump 提交 + 一次 workflow 运行**，两件事分开看；workflow 重跑不会改任何版本号。
 
 它按固定顺序跑，前面任何一步红了都走不到发布：
 
-1. 校验 `package.json` 与 `package-lock.json` 的版本号一致。
+1. tag 触发时先验 tag 名与清单版本一致（手动触发没有这一步）。
 2. typecheck。
 3. 测试。
-4. `npm run check:release`。
+4. `pnpm run check:release`。
 5. release-guard。产物没变就中止 —— 发了等于制造一个内容相同的新版本号。
    首次发版还没有任何 tag，这一步自动跳过。
+   **tag 触发时基线要排除正在发的那个 tag**，否则 HEAD 就是被 tag 的提交、区间恒空，
+   一次完全正常的发布会被判成「没有可发布的内容」。
 6. 探该版本在不在 npm 上。在就跳过发布，补跑一条流水线不会撞 403。
 7. `npm publish --provenance`。认证走 OIDC，仓库里没有任何长期凭据。
 8. 打 `v<version>` tag 并推送；tag 已存在则跳过。
-9. 建 GitHub Release：tag 名与标题都是 `v<version>`（**`v` 前缀是形状，不是审美** —— 守卫靠
-   `git describe --match 'v[0-9]*'` 看它）；**版本号带预发布段就加 `--prerelease`**，正式版不加；Release 已存在则跳过。
+9. 建 GitHub Release：正文**读 Release Drafter 草稿**（tag `next`），读不到或读空才回落
+   `--generate-notes`，且读不到会发 `warning` —— 那是配置坏了，与「本轮没有带标签的 PR」不是一回事。
+10. 读走正文后**删掉草稿**（只删 tag 不以 `v` 开头的那一个，且 `--cleanup-tag=false`）。
+   不删的后果不是「草稿空白」而是**草稿停在旧分界**：下一版读到上一批的正文，而草稿看着有内容。
+
+   形状由 [test/redlines.test.ts](../test/redlines.test.ts) 的「发布流程」一组钉住（含反向控制）。
 
 **git 侧的两样产物（tag 与 Release）都由流程产出 —— 不靠人记得去补。**
-2026-09-22 之前第 9 步不存在：1.0.0 与 1.1.0 的 Release 都是发完之后**手工补建**的，
+2026-09-22 之前建 Release 那一步不存在：1.0.0 与 1.1.0 的 Release 都是发完之后**手工补建**的，
 于是「每发一次版都要有人想起这件事」。**同一个动作每轮都要人提醒 = 该把它并进流程** ——
 现在那条只作为**兜底**（例如手动发布，或某次 Release 建漏了）：
 `gh release create v<version> --title v<version> --prerelease --generate-notes`（正式版去掉 `--prerelease`）。
 
-**第 9 步的正文来源是两级：草稿 → `--generate-notes` 回落。**
+**正文来源是两级：草稿 → `--generate-notes` 回落。**
 仓里有一份 Release Drafter 维护的**草稿** Release（tag 滚动名 `next`，与 `v<版本>` 互不撞，
-所以第 9 步那个「Release 已存在」的判断不会命中它）：它按 PR 标签汇总合并内容。
+所以那个「Release 已存在」的判断不会命中它）：它按 PR 标签汇总合并内容。
 流程先读草稿，读到且**有条目**就用它作正文；草稿为空（本版没有带标签的 PR）时回落
 GitHub 自动生成。两条路都在 [release.yml](../.github/workflows/release.yml) 的
 `Pick the release body` 步骤里，日志会打出实际用了哪一路。
@@ -70,6 +81,11 @@ GitHub 自动生成。两条路都在 [release.yml](../.github/workflows/release
 后者是**正常情况**（本版没有带标签的 PR，或只有 admin bypass 直提）。两者都会走回落，所以流程在
 「读不到」时**发一条 `::warning::`** —— 否则「发版成功但正文其实走了回落」就是**静默失败**：
 结果看着对，实际少了一层。看到那条 warning 就去查配置，别当成正常。
+
+**读完必须删草稿。** Release Drafter 以「最新的正式版」作分界线，它自己不认哪个草稿被消费过。
+不删的后果不是「草稿空白」而是**草稿停在旧分界** —— 下一版读到的是**上一批**的正文，
+而草稿看上去「有内容」。只删 tag 不以 `v` 开头的那一个，且 `--cleanup-tag=false`：
+`gh release delete` 默认连带删 tag，而 tag 是守卫 `git describe --match 'v[0-9]*'` 读的东西。
 
 机制、标签映射与本仓适配情况见 [RELEASE-DRAFTER.md](RELEASE-DRAFTER.md)。
 
@@ -98,7 +114,7 @@ GitHub 自动生成。两条路都在 [release.yml](../.github/workflows/release
 
 手动发的顺序：
 
-1. 跑「发版前确认」那一节的全部条目（`npm test` 会顺带 `npm run build`）。
+1. 跑「发版前确认」那一节的全部条目（`pnpm test` 会顺带 `pnpm run build`）。
 2. 确认 `lib/` 是**刚构建过**的：`files` 里写着 `lib`，而它被 `.gitignore` 忽略 ——
    干净检出上直接 `npm publish` 会发出去一个没有产物的包，且 npm 不会报错。
 3. `npm publish`。
@@ -108,7 +124,7 @@ GitHub 自动生成。两条路都在 [release.yml](../.github/workflows/release
 ## 发布后缺陷处理
 
 **不发 unpublish。** 已经有人装过的版本一旦撤下，他们的 lockfile 就指向一个不存在的版本，
-下一次 `npm ci` 直接失败。正确动作是四步固定：
+下一次 `pnpm install --frozen-lockfile --config.node-linker=hoisted` 直接失败。正确动作是四步固定：
 
 1. `npm deprecate <name>@<version> "原因与替代版本"` —— 装过的人会在安装时看到这句话。
 2. 修。
@@ -193,15 +209,19 @@ Q0 是这道链上最常被跳过的一问：一个几百行的内部重构，�
 [check-release.mjs](../scripts/check-release.mjs) 断言 —— 任何一条不满足都只会**静默**回落成包名、
 `package.json` 的 `description` 或宿主的默认图形，界面上不报错。规则见 [locale 规则层](../locale/AGENTS.md)。
 
-要确认实际打进去的是什么，跑 `npm pack --dry-run` 看清单，不要靠读 `files` 推断。
+要确认实际打进去的是什么，跑 `pnpm pack --dry-run` 看清单，不要靠读 `files` 推断。
 
 ## 构建链事实
 
-- `npm run build` 三步缺一不可：宿主 `tsc`、客户端 `tsc`（只出声明）、esbuild 打浏览器信封。
+- `pnpm run build` 三步缺一不可：宿主 `tsc`、客户端 `tsc`（只出声明）、esbuild 打浏览器信封。
 - `lib/` 不在版本控制里，所以发布前必须先构建，别指望 checkout 出来就有产物。
-- 本仓库**不声明 `prepare`**：`npm ci` 会执行它，从而在 typecheck 之前先产出 `lib/`，
+- 本仓库**不声明 `prepare`**：安装会执行它，从而在 typecheck 之前先产出 `lib/`，
   遮住「类型检查偷偷依赖构建产物」这类缺陷。理由见
   [决策记录](../.agents/notes/2026-09-17-prepare-script-decision.md)。
+- **esbuild 的安装脚本必须放行**：pnpm 11 默认拦掉依赖的构建脚本，而 esbuild 的 postinstall
+  正是放置平台二进制的那一步。放行声明在 [pnpm-workspace.yaml](../pnpm-workspace.yaml) 的
+  `allowBuilds`（不是 `package.json` 的 `pnpm` 字段 —— pnpm 11 已不读那个字段，会带警告忽略它）。
+  被拦时的症状是构建那一步报「找不到二进制」，而不是报真正的原因。
 
 ## 认证与发布
 
@@ -216,7 +236,7 @@ Q0 是这道链上最常被跳过的一问：一个几百行的内部重构，�
 
 1. 仓库 secret `DSH_CI_API_KEY` —— 契约巡检的专用 key，见 [CI 说明](#ci-说明)。
 2. 本地环境变量 `DEEPSEEK_API_KEY` —— 插件日常继承的那把；跑 `acceptance.mjs` 时要它在环境里。
-   本机跑 `npm run test:contract` 时，缺 `DSH_CI_API_KEY` 也会回落用它，所以不必为本地另配一把。
+   本机跑 `pnpm run test:contract` 时，缺 `DSH_CI_API_KEY` 也会回落用它，所以不必为本地另配一把。
 
 **两把 key 不要混用**：前者每周打一次真上游，混进主 key 的调用记录里就分不清是谁在调。
 

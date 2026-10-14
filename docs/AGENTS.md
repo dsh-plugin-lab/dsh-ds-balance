@@ -13,6 +13,6 @@ docs/ 特有约束：
 - **活文档不抄会漂的值**：宿主版本范围、dist-tag 实际版本、测试数量一律写指针或现查命令。红线在 [../test/redlines.test.ts](../test/redlines.test.ts)。
 - 一份事实一个 home：别的文档要讲同一件事时写指针，不重抄内容。
 - 链接一律相对路径；**相对链接指不到文件时 `test/redlines.test.ts` 的「文档链接」会红**
-  （`npm test` 里跑，不需要单独命令）。`docs/postmortem/` 与 `.agents/notes/` 不查 ——
+  （`pnpm test` 里跑，不需要单独命令）。`docs/postmortem/` 与 `.agents/notes/` 不查 ——
   它们写死当时的事实、按规则不追改。
 - 不写本机路径、端口、profile 名与用户名 —— 用占位符。

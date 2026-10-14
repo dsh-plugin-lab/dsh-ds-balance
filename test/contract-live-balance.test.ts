@@ -8,7 +8,7 @@ import { contractKeyMissingMessage, resolveContractKey } from './contract-key.ts
  * - 要真实凭据，按 [contract-key.ts](contract-key.ts) 的顺序从环境变量读：
  *   先 `DSH_CI_API_KEY`（契约巡检的专用 key，CI 上由同名仓库 secret 注入），
  *   缺了回落 `DEEPSEEK_API_KEY`（本机日常那把）。两个都没有时**失败而不是跳过**。
- * - 只被 [vitest.contract.config.ts](../vitest.contract.config.ts) 收集，`npm test` 不会跑到它。
+ * - 只被 [vitest.contract.config.ts](../vitest.contract.config.ts) 收集，`pnpm test` 不会跑到它。
  *
  * 它不消耗余额：`/user/balance` 是查询接口。
  * 失败信息里绝不回显凭据本身。

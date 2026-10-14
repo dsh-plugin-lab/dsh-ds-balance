@@ -21,5 +21,5 @@
 
 ## 改后必测
 
-- `npm run typecheck`（端口一改，实现立刻要跟上）。
+- `pnpm run typecheck`（端口一改，实现立刻要跟上）。
 - 新增端口必须同步 [docs/BACKEND-CONTRACTS.md](../../docs/BACKEND-CONTRACTS.md) 的 §5 与 [src/adapters/README.md](../adapters/README.md)。

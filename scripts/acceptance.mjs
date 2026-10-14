@@ -42,7 +42,7 @@ const check = (name, fn) => checks.push({ name, fn })
 check('目标目录里有一份构建好的包', () => {
   if (!existsSync(join(target, 'package.json'))) throw new Error('没有 package.json')
   if (!existsSync(join(target, 'lib', 'index.js'))) {
-    throw new Error('没有 lib/index.js —— 先在该目录跑 npm run build')
+    throw new Error('没有 lib/index.js —— 先在该目录跑 pnpm run build')
   }
   return target
 })

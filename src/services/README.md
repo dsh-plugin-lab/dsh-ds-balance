@@ -57,5 +57,5 @@
 
 ## 改后必测
 
-- `npx --no-install vitest run test/key-resolver.test.ts test/config-service.test.ts test/balance-service.test.ts test/scheduler.test.ts`
+- `pnpm --config.verify-deps-before-run=false exec vitest run test/key-resolver.test.ts test/config-service.test.ts test/balance-service.test.ts test/scheduler.test.ts`
 - 覆盖：密钥解析优先级与回落、每次现读配置、状态机（ok / stale / error / empty）、inflight 合并、冷却、按账本恢复、退避与抖动。
