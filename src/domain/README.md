@@ -25,7 +25,7 @@
 
 ## 改后必测
 
-- `npx --no-install vitest run test/money.test.ts test/severity.test.ts test/select.test.ts test/normalize.test.ts test/situation.test.ts`
+- `pnpm --config.verify-deps-before-run=false exec vitest run test/money.test.ts test/severity.test.ts test/select.test.ts test/normalize.test.ts test/situation.test.ts`
 - 金额：往返一致、超 8 位截断、非法输入抛错。
 - 严重度：五档 + 阈值边界取等号 + 不可用压过阈值。
 - 处境：真值表（每个取值一组事实）、覆盖度（每个取值都有生产方）、两条刻意的优先级。

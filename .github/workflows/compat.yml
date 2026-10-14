@@ -86,16 +86,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # pnpm 必须排在 setup-node 之前，否则 `cache: pnpm` 找不到 store。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
 
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
-      # swap 内部先改写 package.json 的声明区间、跑裸 npm install，再跑 verify。
-      # verify 不是陪衬：npm install 会假绿（失败但 node_modules 停在旧版本上），
+      # swap 内部先改写 package.json 的声明区间、跑一次**不带 frozen** 的安装，再跑 verify。
+      # verify 不是陪衬：安装会假绿（失败但 node_modules 停在旧版本上），
       # 不回头确认实际装到了什么，后面的测试就跑在旧依赖上、给出与事实相反的信号。
       - name: Swap onto the ${{ matrix.line }} line and confirm what got installed
         id: swap
@@ -107,12 +112,12 @@ jobs:
       - name: Typecheck
         id: typecheck
         continue-on-error: ${{ !matrix.blocking }}
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Test
         id: test
         continue-on-error: ${{ !matrix.blocking }}
-        run: npm test
+        run: pnpm test
 
       # 作业级 continue-on-error 免掉的是「阻断」，不是「可见」：
       # 哪条线、红在哪一步都进跟踪 issue —— 但只报**承诺线**（记录线红了不追issue，见文件头）。

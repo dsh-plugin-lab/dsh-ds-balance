@@ -60,8 +60,8 @@
 
 3. 启动（或重启）`dsh --profile web`，左边栏底部就会出现余额条目。
 
-从源码安装：`git clone` 之后 `npm install && npm run build`，再执行 `dsh plugin --profile web add "$PWD"`，同样重启生效。
-那一步 `npm install` 不能省 —— 按路径挂载时依赖由仓库自己提供，漏装会让插件显示「未运行」。
+从源码安装：`git clone` 之后 `pnpm install && pnpm run build`，再执行 `dsh plugin --profile web add "$PWD"`，同样重启生效。
+那一步 `pnpm install` 不能省 —— 按路径挂载时依赖由仓库自己提供，漏装会让插件显示「未运行」。
 
 ## 显示什么
 

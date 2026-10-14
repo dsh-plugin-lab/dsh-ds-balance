@@ -4,13 +4,13 @@
  *
  * 用法：
  *   node scripts/compat-swap.mjs check                # 列出各包在 latest / next / alpha 上的版本
- *   node scripts/compat-swap.mjs swap --line next                       # 改写 package.json，再跑裸 npm install
+ *   node scripts/compat-swap.mjs swap --line next                       # 改写 package.json，再重装一次
  *   node scripts/compat-swap.mjs swap --line 0.1.7-rc --only 0.1.7-rc  # 按版本前缀换族并临时收窄（测低族）
  *   node scripts/compat-swap.mjs verify --line next                     # 断言 node_modules 里真的装在目标版本上
  *
  * 换版**保形**：只换版本号，运算符（`^` / `>=` / `~` …）原样保留 —— 见 swapRange。
  *
- * 为什么要有 `verify`：`npm install` 会**假绿** —— 它可能失败，而 node_modules 停在旧版本上，
+ * 为什么要有 `verify`：安装会**假绿** —— 它可能失败，而 node_modules 停在旧版本上，
  * 于是测试跑在旧依赖上、给出与事实相反的信号。换版后必须回头看实际装到了什么。
  *
  * 包在某条线上没有版本时，按它**声明在哪**分档（与 dsh-zhihu-search 同一条规则）：
@@ -129,9 +129,9 @@ function dropFamily(families, prefix) {
 /**
  * 从族列表里**只保留**下限版本以 `prefix` 开头的那一族（`--only`）。
  *
- * 为什么需要它：声明面是并集，而 npm 解析并集区间时给每个包选的是**匹配集里最高的**那个版本。
+ * 为什么需要它：声明面是并集，而包管理器解析并集区间时给每个包选的是**匹配集里最高的**那个版本。
  * 所以「测承诺里的某一族」（尤其低族）不能靠保留全部族 —— 那样装出来的永远是最高族。
- * 2026-10-10 实测（姊妹仓 dsh-zhihu-search 同一改动）：保留两族换到低族时，`npm install`
+ * 2026-10-10 实测（姊妹仓 dsh-zhihu-search 同一改动）：保留两族换到低族时，安装器
  * 装到最高族，`verify` 全红。`--only` 把声明面**临时收窄成只有目标族**；收窄后的清单是
  * 一次性测量、**不提交**（提交的那份始终是并集声明面）。
  */
@@ -386,23 +386,26 @@ async function swap(line, dropPrefix, onlyPrefix) {
     console.log(`已经是 ${line} 线的版本，package.json 未改动。`)
   } else {
     writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n')
-    console.log(
-      `\npackage.json 改了 ${touched} 处。回滚：git checkout package.json package-lock.json`,
-    )
+    console.log(`\npackage.json 改了 ${touched} 处。回滚：git checkout package.json pnpm-lock.yaml`)
   }
 
   console.log(
-    `\n跑裸 npm install（shell: true 只是为了在 Windows 上找到 npm.cmd，没有用 shell 特性）……`,
+    '\n跑一次不带 frozen 的安装（shell: true 只是为了在 Windows 上找到 pnpm.cmd，没有用 shell 特性）……',
   )
-  // 换线 = **从零装**。实测两道障碍，全是"旧线残留"：
-  //   1. 锁文件记着换线前的解析 —— alpha 锁 + rc.2 manifest 直接 ERESOLVE。
-  //   2. 已装的 node_modules 也是旧线的树 —— npm 拿已装的 dsh-brand@alpha 对抗要装的
-  //      peer dsh-brand@^0.1.5-rc.2，同样 ERESOLVE。只有"无锁 + 空树"装得出来
-  //      （探针 3 实测通过：verify 11/11 全落在目标线）。
-  // 删掉两者，让 npm 只按新 manifest 解。回滚不变：git checkout 取回两个文件，
-  // node_modules 由 install 重建。
-  // 两种锁文件都清：npm 仓只有前者，pnpm 仓只有后者。
-  for (const lock of ['package-lock.json', 'pnpm-lock.yaml']) {
+  // 换线 = **从零装**。两道障碍，全是「旧线残留」：
+  //   1. 锁文件记着换线前的解析 —— 用旧锁装新 manifest 直接失败。
+  //   2. 已装的 node_modules 也是旧线的树 —— 已装的旧版本会与要装的 peer 对抗。
+  //      只有「无锁 + 空树」装得出来。
+  // 删掉两者，让包管理器只按新 manifest 解。回滚不变：git checkout 取回文件，
+  // node_modules 与锁文件由安装重建。
+  //
+  // ⚠️ 这两条最早是量 npm 的行为量出来的。迁到 pnpm 之后**重测过**（2026-10-14）：
+  // 换到 `next` 线后 13 个包全部落在 0.2.0-rc.2，verify 13/13 通过 —— 结论在 pnpm 上
+  // 同样成立，所以保留，实现换成 pnpm。
+  //
+  // 仍需留意：pnpm 删掉锁文件后是**重新解析**而不是按旧树增量装，装出来的那棵树与当初
+  // npm 那次不是同一棵。要比较两者的解析结果，得对同一份 manifest 各装一遍再比。
+  for (const lock of ['pnpm-lock.yaml']) {
     if (existsSync(lock)) {
       rmSync(lock)
       console.log(`已删 ${lock}（它记着换线前的解析）。`)
@@ -412,12 +415,15 @@ async function swap(line, dropPrefix, onlyPrefix) {
     rmSync('node_modules', { recursive: true, force: true })
     console.log('已删 node_modules（它装的是换线前那条线的树）。')
   }
-  const result = spawnSync('npm', ['install'], { stdio: 'inherit', shell: true })
+  const result = spawnSync('pnpm', ['install', '--config.node-linker=hoisted'], {
+    stdio: 'inherit',
+    shell: true,
+  })
   if (result.status !== 0) {
-    console.error(`npm install 退出码 ${result.status}`)
+    console.error(`pnpm install 退出码 ${result.status}`)
     return 1
   }
-  console.log('\nnpm install 成功 —— 但这不代表装到了目标版本，接着跑 verify。')
+  console.log('\npnpm install 成功 —— 但这不代表装到了目标版本，接着跑 verify。')
   return verify(line)
 }
 

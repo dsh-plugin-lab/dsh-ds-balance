@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
  * 产物级测试：读 `lib/`，不看 `src/`。
  *
  * 拦的是「源码对但产物错」那一类事故 —— 单元测试读的是函数返回值，覆盖不到构建链。
- * **依赖 `npm run build` 先跑过**；`npm test` 自带 build，直接跑 vitest 时需要先构建。
+ * **依赖 `pnpm run build` 先跑过**；`pnpm test` 自带 build，直接跑 vitest 时需要先构建。
  */
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
@@ -28,7 +28,7 @@ const patchSource = readFileSync('cordis.patch.yml', 'utf8')
 const ENTRY_ID = /^\s*-\s*id:\s*(\S+)\s*$/m.exec(patchSource)?.[1]
 if (ENTRY_ID === undefined) throw new Error('cordis.patch.yml 里找不到 insert 行的 id')
 
-const MISSING = 'lib/ 里没有产物：先跑 `npm run build`（`npm test` 自带这一步）'
+const MISSING = 'lib/ 里没有产物：先跑 `pnpm run build`（`pnpm test` 自带这一步）'
 
 describe('构建产物', () => {
   it('宿主入口与浏览器信封都已生成', () => {

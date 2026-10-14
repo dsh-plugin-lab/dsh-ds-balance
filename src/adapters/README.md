@@ -36,5 +36,5 @@
 
 ## 改后必测
 
-- `npx --no-install vitest run test/http-deepseek-client.test.ts test/domain-core-store.test.ts test/salt-file.test.ts test/memory-metrics.test.ts`
+- `pnpm --config.verify-deps-before-run=false exec vitest run test/http-deepseek-client.test.ts test/domain-core-store.test.ts test/salt-file.test.ts test/memory-metrics.test.ts`
 - 覆盖：URL 拼接、Bearer 头、401/429、非 JSON 的 200、`fetch` 抛错、超时、调用方取消；存储的记录往返、按账本过滤、懒打开与失败重试、降级模式、幂等关闭；盐的生成 / 复用 / 权限 / 空白判定；指标键的稳定性与聚合。

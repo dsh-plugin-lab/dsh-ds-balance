@@ -52,7 +52,7 @@
     曾经只动依赖段，于是换线后两者必然不一致，[redlines.test.ts](../test/redlines.test.ts) 的
     「区间与 `engines.dsh` 逐字相同」**每周必红**，且红的恰好是能盖住真正不兼容点的那一条。
     `selftest` 里那条整份换版的断言就是它的守卫生效证明。
-  - **`verify` 不是可选项**：`npm install` 会假绿 —— 它失败但 `node_modules` 停在旧版本上，测试于是跑在旧依赖上、给出与事实相反的信号。
+  - **`verify` 不是可选项**：安装会假绿 —— 它失败但 `node_modules` 停在旧版本上，测试于是跑在旧依赖上、给出与事实相反的信号。
   - 只换 `@deepseek-ai/dsh-` 前缀；`@deepseek-ai/cordis` 与 `@deepseek-ai/schemastery` 不带这个前缀，天然在替换面之外（它们的 `next` 比 `latest` 旧）。
   - 查 dist-tags 用 HTTP 打 registry，不调 `npm view` —— 少一层 shell 依赖。
   - 由 [compat.yml](../.github/workflows/compat.yml) 调用。

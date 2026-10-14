@@ -57,7 +57,7 @@ sidebar/ 特有约束：
   - 理由：仓库红线，`bundle-purity gate` 会拒；`ui-plugin-manager` 的 `PANEL_ID` 正是值导出。
   - 替代：面板 id 用本目录的字面量常量（`'plugins'`），注释里带宿主 `路径:行号` 引用 —— 见 `../index.tsx` 的 `PLUGINS_PANEL_ID`，对照 `ui-plugin-manager/src/client/index.ts:47`。
 - 消费宿主的跨插件服务一律**鸭子类型收窄**，不 import 宿主包的类型、不为它新增 npm 依赖。
-  - 理由：那些包不在本仓的 `node_modules` 与 `package-lock.json` 里，`import type` 也会给声明面添一条边。
+  - 理由：那些包不在本仓的 `node_modules` 与 `pnpm-lock.yaml` 里，`import type` 也会给声明面添一条边。
   - 先例：`../index.tsx` 的 `LayoutFace`（公开面见宿主 `ui-layout/src/client/service.ts:28-52` 的 `ILayout`）。
   - **配置表单不必再走这一手**：`ctx.configForms.get(ENTRY_ID)` 是官方客户端服务，
     类型可以直接引（原先那个 `RawScope` 鸭子类型适配层随被删的客户端作用域服务一起删了）。

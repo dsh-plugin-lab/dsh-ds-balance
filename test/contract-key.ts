@@ -12,7 +12,7 @@
  *
  * - `DSH_CI_API_KEY` 优先：契约巡检的**专用** key，CI 上由同名仓库 secret 注入。
  * - `DEEPSEEK_API_KEY` 兜底：本机日常那把，插件自己继承的就是它。
- *   没有这层兜底，本地跑 `npm run test:contract` 会直接缺 key。
+ *   没有这层兜底，本地跑 `pnpm run test:contract` 会直接缺 key。
  */
 export const CONTRACT_KEY_VARS = ['DSH_CI_API_KEY', 'DEEPSEEK_API_KEY'] as const
 
