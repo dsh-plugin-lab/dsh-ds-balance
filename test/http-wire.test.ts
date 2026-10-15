@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { BalanceView } from '../src/domain/balance.ts'
 import { parseMoney } from '../src/domain/money.ts'
 import { newRequestId, toWireBalanceView, toWireError } from '../src/http/wire.ts'
+
+/** 这条路上那份凭据的身份（掩码）；测试只关心它被原样带出去。 */
+const IDENTITY = 'sk-c08d*****3b84'
 import { SCHEMA_VERSION } from '../src/version.ts'
 import type { BalanceResponse } from '../src/client/api-types.ts'
 
@@ -33,7 +36,7 @@ function view(patch: Partial<BalanceView> = {}): BalanceView {
 
 describe('toWireBalanceView', () => {
   it('金额一律折成八位小数字符串', () => {
-    const body = toWireBalanceView(view(), 'a1b2c3d4', 'req_test')
+    const body = toWireBalanceView(view(), 'a1b2c3d4', IDENTITY, 'req_test')
     expect(body.balances[0]?.total).toBe('110.00000000')
     expect(body.balances[0]?.granted).toBe('10.00000000')
     expect(body.balances[0]?.toppedUp).toBe('100.00000000')
@@ -43,7 +46,7 @@ describe('toWireBalanceView', () => {
   })
 
   it('回传 schema 版本、请求标识与账本短标识', () => {
-    const body = toWireBalanceView(view(), 'a1b2c3d4', 'req_test')
+    const body = toWireBalanceView(view(), 'a1b2c3d4', IDENTITY, 'req_test')
     expect(body.schemaVersion).toBe(SCHEMA_VERSION)
     expect(body.requestId).toBe('req_test')
     expect(body.accountTag8).toBe('a1b2c3d4')
@@ -63,6 +66,7 @@ describe('toWireBalanceView', () => {
         severity: 'unknown',
       }),
       '',
+      IDENTITY,
       'req_test',
     )
     expect(body.fetchedAt).toBe(0)
@@ -84,13 +88,14 @@ describe('toWireBalanceView', () => {
         },
       }),
       '',
+      IDENTITY,
       'req_test',
     )
     expect(body.error).toEqual({ code: 'NO_KEY', message: 'no api key', retryable: false })
   })
 
   it('响应体满足前端契约类型 BalanceResponse（编译期断言）', () => {
-    const body: BalanceResponse = toWireBalanceView(view(), 'a1b2c3d4', 'req_test')
+    const body: BalanceResponse = toWireBalanceView(view(), 'a1b2c3d4', IDENTITY, 'req_test')
     expect(body.severity).toBe('ok')
   })
 })

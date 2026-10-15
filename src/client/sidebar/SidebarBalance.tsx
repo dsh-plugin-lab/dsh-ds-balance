@@ -37,6 +37,7 @@ import {
   formatMoney,
   ringRatioOf,
   selectionOf,
+  sourceIdentityOf,
   sourceLabelKeyOf,
   type RingMarker,
 } from '../model.ts'
@@ -580,7 +581,18 @@ export function SidebarBalance({
   // 那时 `shown === null`，按表标就会在一份没有数字的浮层里写「（API Key）」。
   // 用 `shown !== null` 判，这条路径自动正确，不需要为每个处境各想一遍。
   const sourceKey = shown === null ? null : sourceLabelKeyOf(response.source)
-  const sourceLabel = sourceKey === null ? null : t(sourceKey)
+  // 标签优先报**哪一份凭据**（掩码 key / 账号名），报不出来才退回**哪条路**。
+  // 两类问题不同：路名回答「官方端点还是账号」，身份回答「具体是哪一把」——
+  // 后者才是用户换完 key 想确认的东西。身份来自同一份响应，所以不会和数字对不上。
+  const sourceIdentity = shown === null ? null : sourceIdentityOf(response)
+  const sourceLabel =
+    shown === null
+      ? null
+      : sourceIdentity !== null
+        ? interpolate(t('popover.source.identity'), { identity: sourceIdentity })
+        : sourceKey === null
+          ? null
+          : t(sourceKey)
   // 年龄 = 收到那份响应时后端报的年龄 + 此后流逝的时间。基准随每次响应一起换，
   // 所以自动轮询带回来的新快照同样会把「多久之前」拨回「刚刚」。
   const ageMs = currentAgeMs(view.seenAt, view.seenAgeMs, now)

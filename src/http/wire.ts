@@ -117,6 +117,14 @@ export interface WireBalanceResponse {
   /** 这一份数字是哪条取数路给的；界面据此在标题里标来源。 */
   source: BalanceSource
   /**
+   * **这条路上用的凭据是哪一份**：掩码 key（首尾片段、不可逆）或账号名。
+   *
+   * 它跟着数字一起走，而不是让界面另外读一次 `/api/v1/sources` —— 两个缓存各自刷新时
+   * 标签会先跳、数字还停在旧的，那就是**标错来源**。读不到时 `null`，
+   * 界面退回「（API Key）」那种路名标签。
+   */
+  sourceIdentity: string | null
+  /**
    * 处境：界面**唯一**的分支入口。
    *
    * 环 / 文案 / 来源标签都由它派生。`state` 与 `severity` 仍留在契约里（旧客户端要活），
@@ -167,12 +175,14 @@ function thresholdPair(pair: ThresholdPair): WireThresholdPair {
  * - 没有快照时 `isAvailable` 记 `false`。
  * @param view - 服务层给出的视图。
  * @param accountTag8 - 当前账本标识前 8 位；没有快照时传空串。
+ * @param sourceIdentity - 这条路上那份凭据的身份（掩码 key / 账号名）；读不到传 null。
  * @param requestId - 本次请求的标识。
  * @returns 契约 §8.3 的响应体。
  */
 export function toWireBalanceView(
   view: BalanceView,
   accountTag8: string,
+  sourceIdentity: string | null,
   requestId: string,
 ): WireBalanceResponse {
   const thresholds: Record<Currency, WireThresholdPair> = {}
@@ -183,6 +193,7 @@ export function toWireBalanceView(
     requestId,
     schemaVersion: SCHEMA_VERSION,
     source: view.source,
+    sourceIdentity,
     situation: view.situation,
     state: view.state,
     stale: view.stale,

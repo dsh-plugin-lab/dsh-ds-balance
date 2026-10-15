@@ -115,6 +115,9 @@ function failureView(
     requestId,
     schemaVersion: SCHEMA_VERSION,
     source,
+    // 进程级失败时**不声称知道凭据身份**：那份身份是异步读的，而这里必须同步返回。
+    // 界面据此退回路名标签，而路名仍然为真。
+    sourceIdentity: null,
     situation: 'internal-error',
     state,
     stale: false,
@@ -141,7 +144,11 @@ export async function handleBalance(request: Request, deps: HttpDeps): Promise<R
       ...(currency === null || currency === '' ? {} : { currency }),
       providerHint,
     })
-    return json(toWireBalanceView(view, deps.service.accountTag8() ?? '', requestId))
+    // 凭据身份跟着这份数字一起回去：界面拿它当标题里的来源标签（「是哪一把」而不是「哪条路」）。
+    const sourceIdentity = await deps.sources.identityOf(view.source)
+    return json(
+      toWireBalanceView(view, deps.service.accountTag8() ?? '', sourceIdentity, requestId),
+    )
   } catch (error) {
     deps.logger?.error('ds-balance: balance handler failed', {
       requestId,

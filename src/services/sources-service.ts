@@ -21,9 +21,11 @@
  */
 
 import { maskKey } from '../domain/credential.js'
+import type { BalanceSource } from '../domain/balance.js'
 import type { Credentials } from '../ports/credentials.js'
 import type { AccountIdentity, AccountSource } from '../ports/account.js'
 import type { Logger } from '../ports/logger.js'
+import { ACCOUNT_SOURCE, HTTP_SOURCE } from './source-selector.js'
 import type { KeyResolver } from './key-resolver.js'
 import { computeAccountTag } from './account-tag.js'
 
@@ -117,6 +119,30 @@ export class SourcesService {
    */
   keyRef(): string {
     return this.currentRef()
+  }
+
+  /**
+   * **这条取数路用的是哪一份凭据** —— 给余额响应标注来路的那个事实。
+   *
+   * 它跟数字一起走（`GET /api/v1/balance` 的 `sourceIdentity`），而不是让界面另外去读一次
+   * `/api/v1/sources`：两个缓存各自刷新时，**标签会先跳、数字还停在旧的**，
+   * 那就是在标错来源 —— 比不标更糟。
+   *
+   * 回的是**不可逆的掩码**（首尾片段）或账号名，不是密钥本身。
+   * 认不出这条路、或这条路没有身份时回 `null`（界面据此退回「（API Key）」那种路名标签）。
+   * @param source - 这一份数字来自哪条路。
+   * @returns 掩码 key / 账号名；没有则 null。
+   */
+  async identityOf(source: BalanceSource): Promise<string | null> {
+    try {
+      const snapshot = await this.snapshot()
+      if (source === HTTP_SOURCE) return snapshot.key.masked === '' ? null : snapshot.key.masked
+      if (source === ACCOUNT_SOURCE) return snapshot.account.name
+      return null
+    } catch {
+      // 读不到身份只是少一个标签，绝不能连累余额响应本身。
+      return null
+    }
   }
 
   /**

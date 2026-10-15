@@ -129,6 +129,8 @@ export function pendingView(): BalanceResponse {
     schemaVersion: 1,
     // 占位视图没有取数路可言；处境为 checking / offline 时界面都不渲染来源标签。
     source: 'deepseek-http',
+    // 占位视图也就没有「哪一份凭据」可言；界面同样不渲染标签。
+    sourceIdentity: null,
     situation: 'checking',
     state: 'empty',
     stale: false,

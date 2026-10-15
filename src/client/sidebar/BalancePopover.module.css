@@ -108,9 +108,16 @@
   color: inherit;
 }
 
-/* 来源标签：跟着标题走、比标题弱一档。括号是词典给的，这里只管颜色与不换行。 */
+/* 来源标签：跟着标题走、比标题弱一档。括号是词典给的，这里只管颜色与不换行。
+   **它现在装的是凭据身份**（掩码 key 或账号名），比从前的「（API Key）」长得多，
+   而浮层只有 300px、这一行还要留鲸鱼图标与右端按钮 —— 所以必须能收缩并省略，
+   `flex: none` 会把标题挤出面板。完整值由 `title` 属性补（见 BalancePopover.tsx）。 */
 .sourceLabel {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--dsw-alias-label-tertiary);
   font-weight: 400;
 }

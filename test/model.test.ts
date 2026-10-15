@@ -11,6 +11,8 @@ import {
   formatMoney,
   ringRatioOf,
   selectionOf,
+  sourceIdentityOf,
+  sourceLabelKeyOf,
 } from '../src/client/model.ts'
 import { presentationOf } from '../src/client/situation.ts'
 
@@ -37,6 +39,46 @@ function response(patch: Partial<BalanceResponse> = {}): BalanceResponse {
     ...patch,
   }
 }
+
+/**
+ * 来源标签的两个输入。
+ *
+ * 标签本身（带全角括号的整句）在组件里拼，这里守的是**喂给它的那两样东西**：
+ * 「哪条路」这个键，以及**「哪一份凭据」这个后加字段的形状守卫** ——
+ * 后者尤其要紧：客户端半边由 HMR 立刻换新、宿主半边要重启才换，
+ * 「新客户端 + 旧宿主」是合法中间态，旧宿主根本不回这个字段。
+ */
+describe('sourceLabelKeyOf / sourceIdentityOf', () => {
+  it('两条官方路各有各的键，认不出来的回 null（不标）', () => {
+    expect(sourceLabelKeyOf('deepseek-http')).toBe('popover.source.key')
+    expect(sourceLabelKeyOf('deepseek-account')).toBe('popover.source.account')
+    expect(sourceLabelKeyOf('projection')).toBeNull()
+    expect(sourceLabelKeyOf(undefined)).toBeNull()
+    expect(sourceLabelKeyOf(null)).toBeNull()
+  })
+
+  it('身份原样带出（掩码或账号名）', () => {
+    expect(sourceIdentityOf(response({ sourceIdentity: 'sk-c08d*****3b84' }))).toBe(
+      'sk-c08d*****3b84',
+    )
+    expect(sourceIdentityOf(response({ sourceIdentity: '张三' }))).toBe('张三')
+  })
+
+  it('**旧宿主没有这个字段 → null**，界面据此退回路名标签', () => {
+    // 关键：不能把 undefined 漏进渲染，也不能让它拼出「（undefined）」。
+    expect(sourceIdentityOf(response())).toBeNull()
+    expect(sourceIdentityOf(response({ sourceIdentity: null }))).toBeNull()
+  })
+
+  it('空串与纯空白当没有（不拼出一对空括号）', () => {
+    expect(sourceIdentityOf(response({ sourceIdentity: '' }))).toBeNull()
+    expect(sourceIdentityOf(response({ sourceIdentity: '   ' }))).toBeNull()
+  })
+
+  it('形状不对（数字 / 对象）当没有，不抛', () => {
+    expect(sourceIdentityOf({ ...response(), sourceIdentity: 42 as unknown as string })).toBeNull()
+  })
+})
 
 describe('dotStateOf', () => {
   it('把 severity 机械映射到五个状态，没有金额判断', () => {

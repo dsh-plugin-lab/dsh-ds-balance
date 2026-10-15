@@ -23,12 +23,24 @@ export const KEY_PROVIDER = 'deepseek-official'
 /** 账号登录那条路的宿主 provider id。 */
 export const ACCOUNT_PROVIDER = 'deepseek-account'
 
+/**
+ * 两条取数路的 id。
+ *
+ * 它们是**闭集的两个成员**（{@link BalanceSource}），所以给名字、不再到处写裸字面量：
+ * 「这条路的凭据是谁」那条判据（[sources-service.ts](sources-service.ts) 的 `identityOf`）
+ * 与回落顺序都要按名字比对，散着写迟早有一处漏改。
+ */
+export const HTTP_SOURCE: BalanceSource = 'deepseek-http'
+
+/** @see HTTP_SOURCE */
+export const ACCOUNT_SOURCE: BalanceSource = 'deepseek-account'
+
 /** 宿主 provider id → 本插件的取数来源。**认得的路只有这里列出的**。 */
 const ROUTED: Readonly<Record<string, BalanceSource>> = {
   // 官方余额端点那条：凭据是 API Key（解析链见 KeyResolver）。
-  [KEY_PROVIDER]: 'deepseek-http',
+  [KEY_PROVIDER]: HTTP_SOURCE,
   // 宿主账号服务那条：凭据是账号登录态。
-  [ACCOUNT_PROVIDER]: 'deepseek-account',
+  [ACCOUNT_PROVIDER]: ACCOUNT_SOURCE,
 }
 
 /**
@@ -37,10 +49,10 @@ const ROUTED: Readonly<Record<string, BalanceSource>> = {
  * Key 优先是刻意的：它让「今天能用的用户」数字一字不变 —— 账号那条路是补上断掉的那条，
  * 不是抢走已经在用的那条。
  */
-export const FALLBACK_ORDER: readonly BalanceSource[] = ['deepseek-http', 'deepseek-account']
+export const FALLBACK_ORDER: readonly BalanceSource[] = [HTTP_SOURCE, ACCOUNT_SOURCE]
 
 /** 一条都不可用时回落到谁。挑 Key 那条，因为它的 `NO_KEY` 文案是既有用户认识的那句。 */
-export const DEFAULT_SOURCE: BalanceSource = 'deepseek-http'
+export const DEFAULT_SOURCE: BalanceSource = HTTP_SOURCE
 
 /** 路由判出来的来源；`'other'` 表示当前跑在别家供应商上（两条官方路都没在用）。 */
 export type RoutedSource = BalanceSource | 'other' | null

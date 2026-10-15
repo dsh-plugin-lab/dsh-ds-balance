@@ -25,6 +25,8 @@ function make(patch: Partial<BalanceResponse>): BalanceResponse {
     requestId: 'req_mock',
     schemaVersion: 1,
     source: 'deepseek-http',
+    // 与后端同形：Key 那条路回首页片段掩码，账号那条路回账号名（下面 account 场景覆写）。
+    sourceIdentity: 'sk-c08d*****3b84',
     situation: 'ok',
     state: 'ok',
     stale: false,
@@ -48,7 +50,7 @@ export const scenarios = {
   ok: make({}),
 
   /** 正常，但数字来自账号登录那条路（用来眼看「来源标签」）。 */
-  account: make({ source: 'deepseek-account' }),
+  account: make({ source: 'deepseek-account', sourceIdentity: '张三' }),
 
   /** 余额偏低但可用。 */
   warn: make({

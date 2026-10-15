@@ -18,6 +18,9 @@ export const zh = {
   // 代码里只做拼接，绝不写死括号字符。
   'popover.source.key': '（API Key）',
   'popover.source.account': '（账号登录）',
+  // 有身份时用它替掉上面那两句：括号里直接放「哪一把凭据」。括号照旧在词典里
+  // （中文全角、英文半角带前置空格），`{identity}` 由 interpolate 填。
+  'popover.source.identity': '（{identity}）',
   'popover.total': '余额',
   'popover.granted': '赠送',
   'popover.toppedUp': '充值',
@@ -146,6 +149,7 @@ export const en: Record<LocaleKey, string> = {
   'popover.title': 'Account balance',
   'popover.source.key': ' (API key)',
   'popover.source.account': ' (account sign-in)',
+  'popover.source.identity': ' ({identity})',
   'popover.total': 'Balance',
   'popover.granted': 'Granted',
   'popover.toppedUp': 'Topped up',
