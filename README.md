@@ -31,13 +31,13 @@
 
 ---
 
-A status ring is pinned to the bottom of the sidebar; clicking it shows the actual balance figures. To change settings, open the **Plugins** page in the sidebar and pick this plugin.
+A status ring is pinned to the bottom of the sidebar; clicking it shows the actual balance figures. To change settings, open the **Plugins** page in the sidebar and pick this plugin. The key and the account both follow the official Models page, and the endpoint is the official one — none of the three is set here.
 
 ## Data and credentials
 
 The balance is read directly from the official DeepSeek API, not estimated from usage.
 
-- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file, and the UI only ever sees a head-and-tail mask (`sk-cf08d*****3b84`) — never the full value.
+- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file.
 - The UI only ever sees a **head-and-tail mask** (`sk-cf08d*****3b84`, the same shape the DeepSeek platform console uses); **the full key never crosses the wire**, is never logged, and is never written to any file of this plugin.
 - Only `api.deepseek.com` is contacted; no other traffic is proxied or forwarded.
 - Balance snapshots are stored per credential — **changing the key starts keeping records afresh**, so old figures are never mixed in.
@@ -71,7 +71,7 @@ Three surfaces, each with one job:
 |---|---|---|
 | Status ring | Pinned to the bottom of the sidebar | See at a glance how much is left and how close you are to the warning threshold |
 | Balance popover | Click to expand | See the total, the granted / topped-up split, and how many minutes old the data is |
-| Settings card | This plugin's details page under Plugins | Change the endpoint, the currency, the warning thresholds, the refresh cadence |
+| Settings card | This plugin's details page under Plugins | Check both ways of reading your balance, and set the currency, the warning thresholds and the refresh cadence |
 
 <p align="center">
   <img src="assets/sidebar-popover_en.png" alt="The DeepSeek Balance entry at the bottom of the sidebar, with the balance popover expanded" width="360">
@@ -97,25 +97,18 @@ The ring itself is "what is going on right now", five states you can tell apart 
 | Colour | State only (normal / low / critical), never the amount; the **critical threshold only sets the colour** and takes no part in drawing the ring |
 | The mark in the middle | **+** means not connected yet; go configure; **cross** means no usable number here — it could not be read, or it was read but the account cannot be used |
 | Hover text | The **amount** when the number is trustworthy, that state's own line otherwise; collapsed and expanded say the same sentence |
-| The source bracket | `(API key)` / `(account sign-in)` to the right of the popover title marks where this number came from; whichever is shown is the one refreshed |
+| The source bracket | To the right of the popover title: which credential this number came from — a head-and-tail mask such as `sk-cf08d*****3b84`, or the signed-in account's name |
 | Data freshness | The "how long ago" in the popover, counted from the moment the data arrived |
 | Manual refresh | Cooldown applies; the cooldown restarts when the refresh finishes, and the seconds on the popover are the real ones left |
-| Credential badge | The label to the right of the key field, with only two wordings — "a key is configured." and "no key is configured." — the same as DSH's own plugin cards |
-| Settings groups | Connection / Display / Thresholds / Refresh, all collapsed by default, expanded from their headers |
+| Settings groups | Connection / Display / Thresholds / Refresh |
 
 ## Configuration
 
 The card lives on the Plugins page: sidebar **Plugins** → "Installed" → click the **DeepSeek Balance** card to step into its details page.
 
-<p align="center">
-  <img src="assets/settings-cards-position_en.png" alt="Plugins page: this plugin's card sits under the Installed group" width="720">
-  <br>
-  <em>The Plugins page: this plugin's card sits under "Installed"; click it to open the details page. The small ring at the bottom of the left-hand bar is the status ring.</em>
-</p>
+The configuration area is on the details page, right below the description, ready to edit:
 
-The configuration area is on the details page, right below the description, ready to edit. **Connection** starts expanded; the other three start collapsed:
-
-- **Connection** — a read-only view of the two balance sources, plus a **Test** button that really calls the provider. Each row shows a status light, the credential in use (a head-and-tail mask such as `sk-cf08d*****3b84`, or the account name) and where that credential comes from. Testing shows a spinner and then the outcome, with the latency, just left of that credential for a few seconds before it clears. Nothing here is editable — the key and the account both follow the official Models page, and the endpoint is bound to the official one.
+- **Connection** — read-only: the two ways this plugin can read your balance, what each one is using right now, where that credential comes from, and a **Test** button that really calls the provider.
 - **Display** — which currency amounts use, or let it follow the account.
 - **Thresholds** — two lines per currency: a warning threshold and a critical threshold. Within one currency the **critical value must stay below the warning value**; saving is blocked otherwise.
 - **Refresh** — the server refresh interval, the UI poll interval and the manual refresh cooldown; the defaults suit most setups.
@@ -125,7 +118,7 @@ Saving applies immediately; there is no need to restart DSH.
 <p align="center">
   <img src="assets/settings-card_en.png" alt="DeepSeek Balance details page: the four configuration groups below the description" width="360">
   <br>
-  <em>The configuration area on the details page. Connection opens by default; a group with an invalid entry expands itself.</em>
+  <em>The configuration area on the details page. A group with an invalid entry expands itself.</em>
 </p>
 
 > **Upgrade notes**: the keys these settings are filed under changed once with a host upgrade, and **old values are not migrated**; after upgrading, fill the four groups in again as above. Separately, **version 3.0 removed two settings**: a hand-written `apiKey` and a custom `baseUrl` now have no effect — the credential is the one the official Models page holds, and the endpoint is the official one. Remove them from your settings file if you had set them by hand.

@@ -1530,12 +1530,8 @@ describe('核心活文档的首行标题', () => {
     // 那样「图序对齐」这句就是空话。这条同时是那条正则的行锚定控制。
     expect(
       en.filter((item) => item.startsWith('image:')),
-      '结构指纹里必须取到三张门面图（去掉 `_en` 后缀后两侧同名）',
-    ).toEqual([
-      'image:assets/sidebar-popover.png',
-      'image:assets/settings-cards-position.png',
-      'image:assets/settings-card.png',
-    ])
+      '结构指纹里必须取到两张门面图（去掉 `_en` 后缀后两侧同名）',
+    ).toEqual(['image:assets/sidebar-popover.png', 'image:assets/settings-card.png'])
     expect(shape('README_zh.md'), '中文门面的节序 / 表块 / 图序必须与英文门面逐条对齐').toEqual(en)
     // 反向控制：删掉一节，指纹必须变得不相等。
     const withoutConfig = shape('README.md').filter((item) => item !== 'bullet')

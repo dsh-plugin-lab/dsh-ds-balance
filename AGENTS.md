@@ -105,8 +105,8 @@
 - [x] 本轮 UI 改动的收尾：文档同步、报告回填、提交
 - [x] 卡片的折叠头已按原生形态取消：不再有要持久化的折叠状态
 - [ ] 阶段 7 交付清单：截图 / 录屏需维护者配合
-- [x] **六张门面图已于第三轮全部重拍**（展示元数据 + 图标落地之后）：`settings-card*.png`、
-  `settings-cards-position*.png`、`sidebar-popover*.png` 各两张，第三轮实测的拍法与判据写进了
+- [x] **四张门面图已于第三轮全部重拍**（展示元数据 + 图标落地之后）：`settings-card*.png`、
+  `sidebar-popover*.png` 各两张，第三轮实测的拍法与判据写进了
   [assets/AGENTS.md](assets/AGENTS.md)（侧栏按容器几何裁、长元素不碰 viewport）。
 - [x] 发布前：加回 `dsh.bundle`、去掉 `private` → `pnpm run check:release` 0 失败
 - [x] 六项发布面全部落地（assets / CONTRIBUTING / PUBLISHING / contract 配置 / 3 个 workflow / 3 个 script）→ [落地记录](.agents/notes/2026-09-17-release-surface-landing.md)
@@ -183,7 +183,7 @@
 - **跨字段约束宿主侧已经拦不住 → [settings 规则层](src/client/settings/AGENTS.md)**：登记接缝被删之后，
   「告急低于预警」只剩消费侧回落与 `POST /api/v1/config` 的写入侧先验两道。**官方 Plugins 页那条写路径拦不住**，
   前端置灰保存只是体验。相关决策见[本轮记录](.agents/notes/2026-09-22-settings-seam-migration.md)。
-- **配置改动不会重新挂载宿主半边**：11 个字段全是 `.volatile()`，Loader 只把新值提交进引用并发一次
+- **配置改动不会重新挂载宿主半边**：9 个字段全是 `.volatile()`，Loader 只把新值提交进引用并发一次
   `loader/volatile-update`。所以「改了配置要重启」是错的，「改了**代码**要重启」才是真的 ——
   而**只改浏览器半边时连重启都不需要**：profile 用 `link:` 挂绝对路径，`pnpm run build` 出来的
   `lib/client.js` 就是宿主读的那一份，HMR 一轮询即换（换不到就刷新页面）。

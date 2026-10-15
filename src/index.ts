@@ -312,7 +312,7 @@ function connectRoute(ctx: Context): {
  *
  * 异步是因为盐要从磁盘读；读失败会降级，不阻断挂载。
  *
- * `refs` 是**引用面**不是值：schema 里 11 个字段全是 `.volatile()` 的，Loader 把
+ * `refs` 是**引用面**不是值：schema 里 9 个字段全是 `.volatile()` 的，Loader 把
  * 值提交进这些引用而不重挂本插件，所以 `apply` 只跑一次，读值一律走
  * `createConfigSource` 的现读路径。
  * @param ctx - 宿主上下文。

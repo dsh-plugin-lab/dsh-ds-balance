@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 
-/** 配置表单的键域：11 个字段都是标量，按普通对象收窄。 */
+/** 配置表单的键域：9 个字段都是标量，按普通对象收窄。 */
 export type ConfigFormOf = ConfigForm<Record<string, unknown>>
 
 /**

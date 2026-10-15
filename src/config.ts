@@ -274,7 +274,7 @@ export function resolveThresholdPairs(value: Config): {
     if (value[pair.critical] < value[pair.warn]) continue
     violations.push(pair.currency)
     if (config === value) config = { ...value }
-    // 字段名是 `keyof Config`（值类型是 11 个字段的并集），逐键赋值 TS 推不出来，
+    // 字段名是 `keyof Config`（值类型是 9 个字段的并集），逐键赋值 TS 推不出来，
     // 所以走一次数值视图 —— 这对字段在 schema 里本来就是数字。
     const numeric = config as unknown as Record<string, number>
     numeric[pair.warn] = pair.defaultWarn

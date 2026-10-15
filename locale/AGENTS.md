@@ -37,7 +37,7 @@
 
 - 门面 [README.md](../README.md) / [README_zh.md](../README_zh.md) 里点名插件的地方 —— 红线钉着逐字一致。
 - [assets/AGENTS.md](../assets/AGENTS.md) 的「什么时候必须重截」：插件页上的标题与描述**画在图上**，
-  所以改了这两份 JSON，`settings-card*.png` 与 `settings-cards-position*.png` 四张都要重拍。
+  所以改了这两份 JSON，`settings-card*.png` 两张都要重拍。
 - **换图标**（`icon.svg`）：`package.json` 的 `icon`、`files` 与文件本身必须同批改 ——
   `check:release` 照宿主 `iconOf()` 的判据对账（相对路径 / 扩展名 / 留在清单目录内 / 普通文件 / ≤256 KiB / 进包）；
   [红线](../test/redlines.test.ts) 的「插件图标」钉住它与圆环同形、弧长 70%、颜色就是 warn 档那个值。
