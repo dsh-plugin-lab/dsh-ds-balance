@@ -22,6 +22,7 @@
 import type { ComponentType } from 'react'
 import {
   IconChevronDownOutlineRegular,
+  IconChevronUpOutlineRegular,
   IconLinkOutlineRegular,
   IconPluginPinwheelOutlineRegular,
   IconRefreshOutlineRegular,
@@ -54,6 +55,21 @@ export const GROUP_ICONS = {
 
 /** 分组键，与 `BalanceSettingsCard` 的分组顺序一致。 */
 export type GroupIconKey = keyof typeof GROUP_ICONS
+
+/**
+ * 分组折叠头的两个箭头。
+ *
+ * **两个都常驻 DOM**，靠 CSS 的透明度互换（收起显下箭头、展开显上箭头）。
+ * 不按 `open` 条件渲染：那样悬浮换箭头时元素会被替换，过渡会闪一下、还会让
+ * `overflow: hidden` 那一行抖动。
+ *
+ * 为什么这一对要放在表里而不是写在 `fields.tsx` 里：本文件是「哪个图标用在哪儿」
+ * 的唯一出处，`fields.tsx` 只该消费它。
+ */
+export const HEADER_CHEVRONS = {
+  closed: IconChevronDownOutlineRegular,
+  open: IconChevronUpOutlineRegular,
+} as const satisfies Record<string, AppIcon>
 
 /**
  * 选择器 pill 右端的 chevron。

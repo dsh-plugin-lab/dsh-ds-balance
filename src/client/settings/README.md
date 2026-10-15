@@ -21,9 +21,13 @@
   理由与替代方案 → [决策记录](../../../.agents/notes/2026-10-15-drop-apikey-field.md)。
 - **连接组默认展开**（`DEFAULT_GROUP_OPEN.connection = true`）：它是这张卡片的第一件事 ——
   用户点进来看的就是「现在通不通」，而它只有两行状态加一个按钮。其余三组默认收起。
+- **一行只放三样东西，一个事实只说一遍**（2026-10-15 定的）：左侧**灯** · 行尾**右槽**（凭据身份）·
+  第二行**来历**。状态徽章整套删了（与灯同义重复）；没有身份时右槽留空。
+- **测试结果借右槽显示 4 秒**（`RESULT_TTL_MS`，成败都走），然后让位回凭据身份 ——
+  **不单开一行**（会顶高行高，还会永久留在屏幕上）。**不用颜色**，成败靠 ✓ / ✗ 与文字。
 - 组内有非法草稿时该组强制展开（`groupOpenNow`），否则 footer 的「请检查标红的字段」会指向一个收起来的组。
 - 被谁依赖：`src/client/index.tsx` 的 `SettingsSeatComponent`。
-- 改后必测：四组各自展开与收起；暂存与保存；非法数字禁用保存；两条途径的状态行与测试结果。
+- 改后必测：四组各自展开与收起；暂存与保存；非法数字禁用保存；两条途径的状态行与那 4 秒的测试结果。
 
 ### BalanceSettingsCard.module.css
 
@@ -38,22 +42,44 @@
 ### fields.tsx
 
 - 职责：字段行的容器与全部控件，以及分组的折叠头与取数途径的状态行。
-- 关键导出：`FieldGroup`、`FieldFrame`、`FieldBadges`、`TextControl`、`SelectorControl`、`ActionRow`、`SourceRow`，以及类型 `FieldStatus`、`SourceStatus`、`SelectorOption`。
-- `FieldGroup` 的折叠头用原语 `DisclosureRow`，不自己画；展开体由原语在 open 时条件渲染，无动画。
-  **常态显示组图标、悬停换成箭头**由原语自带（`previewChevron`），不要自己写一套。
-- `SourceRow` 是**只读状态行**（不是表单字段）：状态点 + 名称 + 右侧徽标 + 一行事实 + 一句说明 + 可选测试结果。
-  状态点逐值抄官方 `ui-settings-models` 的 `.credentialDot`（8×8、`corner-shape: round`）。
-  它不接 `form`，没有草稿也没有撤销。
+- 关键导出：`FieldGroup`、`FieldFrame`、`FieldBadges`、`TextControl`、`SelectorControl`、`ActionRow`、`SourceRow`，以及类型 `FieldStatus`、`SourceStatus`、`SourceLive`、`SelectorOption`。
+- **`FieldGroup` 的折叠头是自绘的，不是原语 `DisclosureRow`**（2026-10-15 定的，**这与本目录
+  2026-10-15 前的规则相反**）：原语在**展开**时无条件把组图标换成上箭头，而我们要的是
+  「常态图标、悬浮才换箭头、展开收起都保持」。取值逐条照抄官方那份 CSS，由
+  [redlines](../../../test/redlines.test.ts) 与**装好的**官方 CSS 逐值比对；
+  无障碍面（`role="button"` / `tabIndex` / `aria-expanded` / Enter/Space）照原语保留。
+  两个箭头是 `HEADER_CHEVRONS`，**都常驻 DOM**，靠 CSS 换（按 `open` 条件渲染会在悬浮时闪）。
+- `SourceRow` 是**只读状态行**（不是表单字段），**一行三样**：左侧灯（或头像）· 名称 + 行尾**右槽**
+  （凭据身份，还可临时被测试结果占用）· 第二行**来历**。
+  灯逐值抄官方 `ui-settings-models` 的 `.credentialDot`（8×8、`corner-shape: round`）。
+  它不接 `form`，没有草稿也没有撤销；右槽子项 `nowrap` + 省略号（换行就是行高跳一下）。
 - 类名拼接统一用官方 `clsx`（平台样式规则要求），不自备工具函数。
 - 被谁依赖：`BalanceSettingsCard.tsx`。
-- 改后必测：数字字段仍是 `type="text"` + `inputMode="numeric"`；选择器仍是 pill + `Menu`；`FieldFrame` 在没有 hint 时不渲染说明行。
+- 改后必测：数字字段仍是 `type="text"` + `inputMode="numeric"`；选择器仍是 pill + `Menu`；`FieldFrame` 在没有 hint 时不渲染说明行；折叠头常态是组图标、悬浮与键盘聚焦才是箭头。
 
 ### fields.module.css
 
 - 职责：字段行、行容器、控件与提示的样式；**纵向节奏的唯一所有者**。
-- 关键规则：`.group`（顶部 12px）、`.groupLast`（尾部 12px）、`.groupNote`（margin-top 4px）、`.fields > * + *`（字段间 0.5px 分隔线）、`.field`（padding 12px 0）、`.row`（整行选择型，padding 12px 0）、`.input`（h34 r8）、`.selector`（h36 r18）。
+- 关键规则：`.group`（flex 列 + 顶部 12px；前四行是原语 `.root` 原本提供的那一层）、`.groupLast`（尾部 12px）、`.groupNote`（margin-top 4px）、`.fields > * + *`（字段间 0.5px 分隔线）、`.field`（padding 12px 0）、`.row`（整行选择型，padding 12px 0）、`.input`（h34 r8）、`.selector`（h36 r18）。
+- **折叠头那六个类**（`.groupHead` / `.groupLeading` / `.groupIcon` / `.groupChevronClosed` / `.groupChevronOpen` / `.groupTitle`）
+  取值**逐条照抄**官方 `ui-primitives/DisclosureRow.module.css`，由 [redlines](../../../test/redlines.test.ts) 与装好的官方 CSS 逐值比对。
+  改任何一个数都得同步改那边。焦点环不自己画（宿主全局 `:focus-visible` 已经在画）。
+- 状态行：`.source` / `.sourceHead` / `.dot*` / `.sourceName` / `.sourceSlot` / `.sourceIdentity` / `.sourceLive` / `.sourceDetail`。
+  **右槽子项必须 `nowrap` + 省略号** —— 测试结果长短不一，换行就是行高跳一下。
 - 被谁依赖：`fields.tsx`；`BalanceSettingsCard.tsx` 另用它的 `.field` 包住测试连接那一行。
 - 改后必测：新增元素的纵向间距必须落在 12px 这一档；中性实线边框 0.5px、状态色边框 1px；控件圆角走 `--dsw-radius-*`（**裸引，不写回落** —— 声明的那条线上它们一定存在）、**不写** `corner-shape`（继承宿主全局 superellipse）；只有必须是真的圆才成对写 `50%` + `corner-shape: round`。
+
+### source-status.ts
+
+- 职责：**两条途径的展示判定** —— 灯色、右槽的凭据身份、第二行的来历。
+- 关键导出：`keyStatusOf`、`accountStatusOf`、类型 `Translate`。
+- **它是一份纯函数，位置是刻意的**：判定原先写在卡片组件里，而组件引 `ui-primitives`、
+  测试环境渲不出来（CSS 解析不了，见 [vitest.config.ts](../../../vitest.config.ts)），
+  于是那段最容易错的逻辑一行覆盖都没有。抽出来之后 [test/source-status.test.ts](../../../test/source-status.test.ts) 能直接断言。
+- 三条设计约束（维护者 2026-10-15 定）就守在这里：① 一个事实不说两遍；
+  ② 没有身份可报时右槽**留空**，不补「未配置」；③ 「本部署没有账号服务」例外，**必须说出来**。
+- 被谁依赖：`BalanceSettingsCard.tsx`。
+- 改后必测：三档来历（file / env / 认不出的来源）；未配置与未登录两个槽都空；服务缺席时说部署事实。
 
 ### use-sources.ts
 
@@ -76,7 +102,8 @@
   与 `AccountSection.module.css` 的 `.avatar`（32×32、`50%` + `corner-shape: round`、
   `object-fit: cover`、底色 `--dsw-alias-bg-skeleton`），`referrerPolicy="no-referrer"`。
 - **加载失败回落成空圆底**，不显示碎图；URL 变了（换账号）会清掉失败标记。
-- 只在**账号那行**渲染：API Key 没有身份可言，不给它画占位头像。
+- **只在账号那行、且已登录时渲染**：API Key 没有身份可言，不给它画占位头像；
+  未登录时那一行落回与 Key 同形的红灯（头像会让人以为「有账号」）。
 - 被谁依赖：`BalanceSettingsCard.tsx`。
 
 ### use-config-form.ts
@@ -122,6 +149,9 @@
 ## 依赖面
 
 - 运行时只 `require` `react`、`react/jsx-runtime` 与 `@deepseek-ai/dsh-client-ui-primitives`，其余全部内联。
-- 用到的原语：`DisclosureRow`、`Menu`、`Tag`，以及 `IconChevronDownOutlineRegular` / `IconApiOutlineRegular` / `IconGlobeOutlineRegular` / `IconWarningOutlineRegular` / `IconRefreshOutlineRegular`（图标按**笔画粗细**分 `Regular` / `Medium`，尺寸走 `size` prop）。
+- 用到的原语：`Button`、`Input`、`Menu`、`StateDot`（测试中的转圈）、`Tag`，以及
+  `HEADER_CHEVRONS.closed` / `.open`（**折叠头的两个箭头，都常驻 DOM**）与 `SELECTOR_ICON` ——
+  图标一律从 [../icons.ts](../icons.ts) 取，不在 JSX 里硬编码；尺寸走 `size` prop
+  （但折叠头里那个由 CSS 覆盖，传不传都一样）。
 - 颜色只走 `--dsw-alias-*` 语义令牌；主题信号只有 CSS 变量，不写 `prefers-color-scheme` 或 `[data-ds-dark-theme]`。
 - 类名拼接用 `clsx`（devDependency，构建期内联）。

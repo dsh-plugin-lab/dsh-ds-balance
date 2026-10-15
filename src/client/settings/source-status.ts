@@ -21,67 +21,60 @@ export type Translate = (key: LocaleKey) => string
  * Key 那条途径的展示状态。
  *
  * **判据只有这一处**：`configured` 来自后端（它已经问过官方 `describe()`，
- * 也在没有 seam 时退到解析链判过），本函数只决定「显示哪句话」。
+ * 也在没有 seam 时退到解析链判过），本函数只决定「显示什么」。
  *
- * 事实行拼三段，各段都只在有值时出现：来源层 · 掩码 · 账本标识。
- * 掩码与账本标识都是**不可逆**的，露它们是有意的（辨识度），见
- * [domain/credential.ts](../../domain/credential.ts)。
+ * 右槽给**凭据身份**（首尾片段掩码，与平台控制台同形、不可逆）；
+ * 第二行给**来历**（这把凭据从哪一层取到的）。
+ * 没有凭据时两个都留空 —— 左边的红灯已经说了「这条途径现在没在用」，
+ * 再补一句「未配置」只是把同一个事实说两遍，还把行撑高。
  * @param key - 后端给的 Key 状态。
  * @param t - 词典读取器。
- * @returns 徽标、事实行、说明行与色调。
+ * @returns 灯色、右槽身份与第二行来历。
  */
 export function keyStatusOf(key: KeySourceInfo, t: Translate): SourceStatus {
-  const configured = key.configured
-  // 来源层讲清这把 key 从哪来；读不到时说「未确认」而不是猜。
-  const source =
-    key.source === 'file'
-      ? t('settings.sources.fromSaved')
-      : key.source === null
-        ? t('settings.sources.unknown')
-        : t('settings.sources.fromEnv').replace('{name}', () => key.ref)
+  if (!key.configured) return { tone: 'missing', identity: '', detail: '' }
   return {
-    tone: configured ? 'ok' : 'missing',
-    badge: configured
-      ? t('settings.sources.keyConfigured')
-      : t('settings.sources.keyNotConfigured'),
-    detail: [source, key.masked, key.tag8].filter((part) => part !== '').join(' · '),
-    hint: t('settings.sources.keyHint'),
+    tone: 'ok',
+    identity: key.masked,
+    detail: sourceLabelOf(key, t),
   }
+}
+
+/**
+ * 「这把凭据从哪来」那句话。
+ *
+ * 三档，且**只有这三档**：官方凭据库存的那份、环境变量、或者读不到来源层时的「未确认」。
+ * 官方 `describe()` 自己也会回 `env`（它内部同样读环境变量），所以「非 file 即环境变量」
+ * 在这条链上是准确的，不是猜的。
+ * @param key - 后端给的 Key 状态。
+ * @param t - 词典读取器。
+ * @returns 一句话；第二行为空串时不渲染。
+ */
+function sourceLabelOf(key: KeySourceInfo, t: Translate): string {
+  if (key.source === 'file') return t('settings.sources.sourceSaved')
+  if (key.source === null) return t('settings.sources.sourceUnknown')
+  return t('settings.sources.sourceEnv').replace('{name}', () => key.ref)
 }
 
 /**
  * 账号那条途径的展示状态。
  *
- * 三档，与 Key 那条的两态**有意不同**：账号未登录时用户有下一步可做（去登录），
- * 所以那句话必须说出来，而不是只给一个「未配置」。
- *
- * 顺序要紧：**服务缺席优先于未登录** —— 前者用户做什么都没用。
+ * **三档，与 Key 那条有意不对称**：账号未登录是**正常状态**（很多人只用 API Key），
+ * 所以它和「没配 key」一样只留一盏红灯、右槽与第二行都留空；
+ * 但**「本部署没有账号服务」必须说出来** —— 那一行整空会读成「这插件坏了」，
+ * 而它其实是部署事实，用户做什么都没用。
  * @param account - 后端给的账号状态。
  * @param t - 词典读取器。
- * @returns 徽标、事实行、说明行与色调。
+ * @returns 灯色、右槽身份（账号名）与第二行（脱敏联系方式）。
  */
 export function accountStatusOf(account: AccountSourceInfo, t: Translate): SourceStatus {
   if (!account.available) {
-    return {
-      tone: 'missing',
-      badge: t('settings.sources.accountUnavailable'),
-      detail: '',
-      hint: t('settings.sources.accountMissingHint'),
-    }
+    return { tone: 'missing', identity: '', detail: t('settings.sources.accountNoService') }
   }
-  if (!account.signedIn) {
-    return {
-      tone: 'missing',
-      badge: t('settings.sources.accountSignedOut'),
-      detail: '',
-      hint: t('settings.sources.accountHint'),
-    }
-  }
+  if (!account.signedIn) return { tone: 'missing', identity: '', detail: '' }
   return {
     tone: 'ok',
-    badge: t('settings.sources.accountSignedIn'),
-    // 名字与脱敏联系方式；都读不到时只留徽标（不留一个空段落）。
-    detail: [account.name, account.contact].filter((part) => part !== null).join(' · '),
-    hint: t('settings.sources.accountHint'),
+    identity: account.name ?? '',
+    detail: account.contact ?? '',
   }
 }

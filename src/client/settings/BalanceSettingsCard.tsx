@@ -12,7 +12,7 @@
  * @module dsh-ds-balance/client/settings/BalanceSettingsCard
  */
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { interpolate } from '../locales.ts'
 import type { LocaleKey } from '../locales.ts'
 import { GROUP_ICONS } from '../icons.ts'
@@ -25,7 +25,7 @@ import {
   SourceRow,
   TextControl,
 } from './fields.tsx'
-import type { SelectorOption, SourceResult } from './fields.tsx'
+import type { SelectorOption, SourceLive } from './fields.tsx'
 import { AUTO_CURRENCY, currencyCodes, THRESHOLD_PAIRS, useConfigForm } from './use-config-form.ts'
 import type { ConfigFormOf } from './use-config-form.ts'
 import { useSources } from './use-sources.ts'
@@ -35,6 +35,20 @@ import css from './BalanceSettingsCard.module.css'
 import fieldCss from './fields.module.css'
 
 export type { ConfigFormOf } from './use-config-form.ts'
+
+/**
+ * 测试结果的**停留时长**。
+ *
+ * 它借右槽显示，几秒后自己让位回「凭据身份」—— 既有反馈，又不会像从前那样
+ * 在屏幕上留一行永久的、还把行高顶起来的结果（维护者 2026-10-15 明确要求）。
+ */
+const RESULT_TTL_MS = 4000
+
+/** 一次测试的结果：哪一行、成败与那句话。 */
+interface TestOutcome {
+  readonly ok: boolean
+  readonly text: string
+}
 
 /** 卡片要求的属性。t 由框架按注册时声明的字典命名空间注入。 */
 export interface BalanceSettingsCardProps {
@@ -97,7 +111,18 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
   // 状态与测试结果。`enabled` 传 available：宿主没服务这个命名空间时不发请求。
   const { sources, loading, refresh } = useSources(available)
   const [testing, setTesting] = useState(false)
-  const [results, setResults] = useState<ReadonlyMap<string, SourceResult> | null>(null)
+  // 刚落定的测试结果，按途径存；几秒后自己清掉（见 RESULT_TTL_MS）。
+  const [outcomes, setOutcomes] = useState<ReadonlyMap<string, TestOutcome> | null>(null)
+  const outcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 卸载时收掉那个计时器：它跨越了组件生命周期（结果比一次渲染活得久）。
+  useEffect(
+    () => () => {
+      if (outcomeTimer.current !== null) clearTimeout(outcomeTimer.current)
+      outcomeTimer.current = null
+    },
+    [],
+  )
 
   // 各组独立展开，不做手风琴：多项同时展开是刻意的（官方 PluginCard.tsx:8-9 的注释）。
   const toggleGroup = (key: GroupKey): void => {
@@ -204,30 +229,39 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
    *
    * **真打上游**（`POST /api/v1/test-connection`），不是本地字符串检查 ——
    * 这里替换掉的正是从前那个「检查字符串 + 等 800ms + 说连接正常」的假按钮。
-   * 两条各测一次，结果按途径分别显示；顺带重读一次状态（测试往往紧跟着「刚改完凭据」）。
+   *
+   * 结果**借用每行的右槽**显示几秒，然后让位回「凭据身份」；顺带重读一次状态
+   * （测试往往紧跟着「刚改完凭据」）。**结果绝不能单开一行**：那会把行高顶起来。
    */
   const runTest = (): void => {
     if (testing) return
     setTesting(true)
-    setResults(null)
+    setOutcomes(null)
+    if (outcomeTimer.current !== null) clearTimeout(outcomeTimer.current)
     void (async () => {
       const [keyResult, accountResult] = await Promise.all([
         runOne('deepseek-http'),
         runOne('deepseek-account'),
       ])
-      setResults(
+      setOutcomes(
         new Map([
           ['key', keyResult],
           ['account', accountResult],
         ]),
       )
       setTesting(false)
+      // 成败都只停 RESULT_TTL_MS：失败也不留下（维护者：不要一个东西一直在那）。
+      // 于是「刚测过」这件事只活在这几秒里 —— 常态下右侧恒是凭据身份。
+      outcomeTimer.current = setTimeout(() => {
+        outcomeTimer.current = null
+        setOutcomes(null)
+      }, RESULT_TTL_MS)
       await refresh()
     })()
   }
 
   /** 测一条途径并折成一句结果文案。 */
-  const runOne = async (source: 'deepseek-http' | 'deepseek-account'): Promise<SourceResult> => {
+  const runOne = async (source: 'deepseek-http' | 'deepseek-account'): Promise<TestOutcome> => {
     try {
       const result = await requestTest(source)
       if (result.ok) {
@@ -257,6 +291,21 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
     }
   }
 
+  /**
+   * 组装一行右槽的临时内容。
+   *
+   * 优先级：正在测 > 刚测完 > 常态。前三者**共用同一个槽**，所以行高不随它们变化 ——
+   * 这正是本轮把「结果行」拆掉换来的东西。
+   * @param row - 途径键（`key` / `account`）。
+   * @returns 交给 SourceRow 的 live；没有临时内容时 null。
+   */
+  const liveOf = (row: string): SourceLive | null => {
+    if (testing) return { kind: 'busy' }
+    const outcome = outcomes?.get(row)
+    if (outcome === undefined) return null
+    return { kind: 'result', ok: outcome.ok, text: outcome.text }
+  }
+
   const footerNote = failed
     ? { text: t('settings.failed'), className: css.failed }
     : invalid
@@ -284,6 +333,8 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
       <FieldGroup
         icon={<GROUP_ICONS.connection size={14} />}
         title={t('settings.group.connection')}
+        // 组级一句替代原来每行各一句的近义说明（那两句本身也是重复）。
+        note={t('settings.sources.groupNote')}
         open={groupOpenNow('connection')}
         onToggle={() => {
           toggleGroup('connection')
@@ -293,20 +344,23 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
           <SourceRow
             label={t('settings.sources.key')}
             status={keyStatus}
-            result={results?.get('key') ?? null}
+            live={liveOf('key')}
+            monoIdentity
           />
           <SourceRow
             label={t('settings.sources.account')}
             status={accountStatus}
-            result={results?.get('account') ?? null}
-            // 头像只在账号那行出现，而且只在真有 URL 时 —— 加载失败回落到圆形底。
-            leading={<AccountAvatar url={sources.account.avatarUrl} />}
+            live={liveOf('account')}
+            // 账号那行**已登录就给头像**（有头像就是身份本身，比灯更有信息）；
+            // 没登录则连头像都不给，落回与 Key 那行同形的红灯。
+            {...(sources.account.signedIn
+              ? { leading: <AccountAvatar url={sources.account.avatarUrl} /> }
+              : {})}
           />
           <div className={fieldCss.field}>
             <ActionRow
               label={testing ? t('settings.testing') : t('settings.test')}
               disabled={disabled || testing || loading}
-              result={null}
               onClick={runTest}
             />
           </div>

@@ -115,7 +115,7 @@ The card lives on the Plugins page: sidebar **Plugins** → "Installed" → clic
 
 The configuration area is on the details page, right below the description, ready to edit. **Connection** starts expanded; the other three start collapsed:
 
-- **Connection** — a read-only view of the two balance sources, plus a **Test both sources** button that really calls the provider. **API key** shows the reference name, where the value comes from (saved credentials or an environment variable) and a head-and-tail mask (`sk-cf08d*****3b84`); **Account sign-in** shows the avatar, display name and masked contact of the signed-in account. Nothing here is editable — the key and the account both follow the official Models page, and the endpoint is bound to the official one.
+- **Connection** — a read-only view of the two balance sources, plus a **Test both sources** button that really calls the provider. Each row shows a status light, the credential in use (a head-and-tail mask such as `sk-cf08d*****3b84`, or the account name) and where that credential comes from. Testing borrows that slot for a few seconds, then restores it. Nothing here is editable — the key and the account both follow the official Models page, and the endpoint is bound to the official one.
 - **Display** — which currency amounts use, or let it follow the account.
 - **Thresholds** — two lines per currency: a warning threshold and a critical threshold. Within one currency the **critical value must stay below the warning value**; saving is blocked otherwise.
 - **Refresh** — the server refresh interval, the UI poll interval and the manual refresh cooldown; the defaults suit most setups.

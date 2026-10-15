@@ -77,30 +77,31 @@ export const zh = {
   // 措辞逐条对齐官方：账号那几句取自 ui-settings-account 的 signedIn / signedOut /
   // profileUnavailable；密钥那几句取自 ui-settings-models 的 apiKeySet / apiKeyUnset。
   // 官方那套词在 settings.account / settings.models 命名空间，别的插件拿不到，所以抄进来。
+  //
+  // **3.0 起这一段只剩两句话**：组级说明 + 每行第二行的「来历」。
+  // 状态徽章（已配置密钥。/ 未配置密钥。…）整套删了 —— 它与左边那盏灯说同一件事，
+  // 而「一个事实说两遍」正是本轮要消掉的东西。判据见 source-status.ts。
   'settings.sources.title': '取数途径',
   'settings.sources.key': 'API Key',
   'settings.sources.account': '账号登录',
-  // 状态徽章（两态，同官方「已配置密钥。/ 未配置密钥。」）
-  'settings.sources.keyConfigured': '已配置密钥。',
-  'settings.sources.keyNotConfigured': '未配置密钥。',
-  'settings.sources.accountSignedIn': '已登录 DeepSeek',
-  'settings.sources.accountSignedOut': '尚未登录',
-  'settings.sources.accountUnavailable': '账号资料暂不可用',
-  // 来源层：讲清这把 key 从哪来。取值来自官方 describe() 的 source。
-  'settings.sources.fromSaved': '已保存的凭据',
-  'settings.sources.fromEnv': '环境变量 {name}',
-  'settings.sources.unknown': '状态未确认',
-  // 说明行：一句，讲这条途径是什么，不重复标签。
-  'settings.sources.keyHint': '跟随官方模型页配好的凭据，或启动环境里的同名变量。',
-  'settings.sources.accountHint': '跟随宿主已登录的 DeepSeek 账号。',
-  'settings.sources.accountMissingHint': '本部署没有账号服务，这条途径不可用。',
-  // 测试
+  // 组级说明：一句替掉原来每行各一句的近义说明。
+  'settings.sources.groupNote':
+    '两条途径都跟随官方：密钥用官方模型页配好的那一份，账号用宿主已登录的那个。本插件不自己保存凭据。',
+  // 第二行的「来历」：这把凭据是从哪一层取到的。取值来自官方 describe() 的 source。
+  'settings.sources.sourceSaved': '取自官方模型页保存的凭据',
+  'settings.sources.sourceEnv': '取自启动环境变量 {name}',
+  'settings.sources.sourceUnknown': '来源未确认',
+  // 账号那条唯一需要说出来的一句：那是**部署事实**，用户做什么都没用；
+  // 而整行留空会被读成「插件坏了」。未登录不说 —— 它是正常状态。
+  'settings.sources.accountNoService': '本部署没有账号服务，这条途径不可用。',
+  // 测试。结果借每行右槽显示 4 秒，所以文案要短；✓ / ✗ 让成败在余光里也分得开
+  // （**不用颜色**是维护者定的）。
   'settings.test': '测试两条途径',
   'settings.testing': '正在测试…',
-  'settings.test.ok': '连接正常 · 延迟 {ms}ms',
-  'settings.test.noKey': '没有可用凭据',
-  'settings.test.notSignedIn': '尚未登录',
-  'settings.test.fail': '连接失败：{message}',
+  'settings.test.ok': '✓ 连接正常 · {ms}ms',
+  'settings.test.noKey': '✗ 没有可用凭据',
+  'settings.test.notSignedIn': '✗ 尚未登录',
+  'settings.test.fail': '✗ 连接失败：{message}',
 
   'settings.hint.displayCurrency': '所选币种不存在时，回落到账户实际持有的币种。',
   'settings.hint.threshold': '后端判定；界面颜色跟随返回的严重度。',
@@ -184,25 +185,19 @@ export const en: Record<LocaleKey, string> = {
   'settings.sources.title': 'Balance sources',
   'settings.sources.key': 'API key',
   'settings.sources.account': 'Account sign-in',
-  'settings.sources.keyConfigured': 'A key is configured.',
-  'settings.sources.keyNotConfigured': 'No key is configured.',
-  'settings.sources.accountSignedIn': 'Signed in to DeepSeek',
-  'settings.sources.accountSignedOut': 'Not signed in',
-  'settings.sources.accountUnavailable': 'Account details are not available yet.',
-  'settings.sources.fromSaved': 'Saved credentials',
-  'settings.sources.fromEnv': 'Env var {name}',
-  'settings.sources.unknown': 'Status unconfirmed',
-  'settings.sources.keyHint':
-    'Follows the credential saved on the official Models page, or the same-named variable in the launch environment.',
-  'settings.sources.accountHint': 'Follows the DeepSeek account signed in to the host.',
-  'settings.sources.accountMissingHint':
+  'settings.sources.groupNote':
+    'Both sources follow the official setup: the key comes from the official Models page, the account is the one signed in to the host. This plugin stores no credential of its own.',
+  'settings.sources.sourceSaved': 'From the credential saved on the Models page',
+  'settings.sources.sourceEnv': 'From the launch env var {name}',
+  'settings.sources.sourceUnknown': 'Source unconfirmed',
+  'settings.sources.accountNoService':
     'This deployment ships no account service, so this source is unavailable.',
   'settings.test': 'Test both sources',
   'settings.testing': 'Testing…',
-  'settings.test.ok': 'Connection looks good · {ms}ms',
-  'settings.test.noKey': 'No credential available',
-  'settings.test.notSignedIn': 'Not signed in',
-  'settings.test.fail': 'Connection failed: {message}',
+  'settings.test.ok': '✓ Connection looks good · {ms}ms',
+  'settings.test.noKey': '✗ No credential available',
+  'settings.test.notSignedIn': '✗ Not signed in',
+  'settings.test.fail': '✗ Connection failed: {message}',
 
   'settings.hint.displayCurrency': 'Falls back to a currency the account actually holds.',
   'settings.hint.threshold': 'Decided on the server; the UI colour follows the returned severity.',
