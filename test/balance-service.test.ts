@@ -19,9 +19,7 @@ import { MemoryMetrics } from '../src/adapters/memory-metrics.ts'
 const SALT = 'test-salt'
 
 const defaults: Config = {
-  apiKey: '',
   apiKeyRef: 'DEEPSEEK_API_KEY',
-  baseUrl: 'https://api.deepseek.com',
   serverRefreshSeconds: 60,
   clientPollSeconds: 30,
   manualRefreshCooldownSeconds: 30,
@@ -61,9 +59,11 @@ function harness(
     source: { get: () => ({ ...defaults, ...configPatch }), watch: () => () => {} },
     env: {},
   })
+  // 密钥从环境变量那一档进来 —— 配置覆盖那档已随 `apiKey` 字段删除（3.0）。
+  // 空串表示「这条路没有凭据」，与从前传 `apiKey: ''` 的语义一致。
   const keys = new KeyResolver({
-    readConfig: () => ({ apiKey: key, apiKeyRef: 'DEEPSEEK_API_KEY' }),
-    env: {},
+    readConfig: () => ({ apiKeyRef: 'DEEPSEEK_API_KEY' }),
+    env: key === '' ? {} : { DEEPSEEK_API_KEY: key },
   })
   const client: DeepSeekClient = {
     fetchBalance: vi.fn().mockResolvedValue(goodRaw),
@@ -80,6 +80,7 @@ function harness(
   const account: AccountSource = {
     signedIn: async () => false,
     accountId: async () => null,
+    profile: async () => null,
     readBalance: async () => null,
   }
   const ledgers = new Map<BalanceSource, SourceLedger>([

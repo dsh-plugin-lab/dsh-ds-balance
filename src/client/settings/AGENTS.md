@@ -4,7 +4,9 @@
 
 settings/ 特有约束：
 
-- 卡片**只做配置**：不许出现任何额度信息、金额、图表、快照列表或估算明细。
+- 卡片**只做配置与来源状态**：不许出现任何额度信息、金额、图表、快照列表或估算明细。
+  （3.0 起加了「两条取数途径的只读状态」—— 那是**配置事实**，不是额度信息；
+  测试结果**只回成败与延迟，绝不回余额预览**，虽然后端 `test-connection` 给得出。）
 - 数值一律按字符串处理；阈值**只存不判**，界面不得依据阈值给任何东西上色 —— 颜色只由后端 `severity` 决定。
   - 唯一的读阈值处是圆环弧长（`../model.ts` 的 `ringRatioOf`），且只读 `warn`。
 - 不许 import 官方 `ui-settings-plugins` 的内部构件（bundle-purity gate 会拒），只能照抄模式。
@@ -20,14 +22,24 @@ settings/ 特有约束：
   **不要再把它加回来** —— 它现在只会给出「这个约束还在被强制执行」的假信号。
 - 纵向间距只有两个所有者：`.group` 的顶部 12px 与 `.groupLast` 的尾部 12px（[fields.module.css](fields.module.css)）；新加元素不许在旁边叠 margin。
 - 分组折叠头一律用原语 `DisclosureRow`，不自己画（[fields.tsx](fields.tsx) 的 `FieldGroup`）。
-  - **例外**：连接组里的二级「自定义设置」用原生 `<details>`（[fields.tsx](fields.tsx) 的 `DetailsGroup`），因为官方 `ProviderEditor` 那一处就是这么做的；本插件照搬官方形态优先于自定规则。
-- 凭据字段的只读形态照官方「网页搜索」卡片：**常态空框（只 `readOnly`，不 `disabled`、不降透明度）**，**不隐藏字段、不另做只读块、框内不写占位符**。
-  **它与静态文本的唯一差别只剩「它在 DOM 里是个 input」**：悬停、指针、焦点、打字全不响应（`pointer-events: none` + 固定描边），改它之前先想清楚「为什么这一格要看起来能编辑」。
-  状态走标签行右侧的徽章（`settings.credential.*`，**只有「已配置密钥。/ 未配置密钥。」两态**，与官方一致），说明走它下方那行（`settings.hint.credential`，一句与状态无关的常量）。
-  **措辞逐字抄官方**：徽章取自 `ui-settings-plugins` 的 `webSearchApiKeySet` / `webSearchApiKeyUnset`，说明取自 `webSearchApiKeyHint`，标签取自 `webSearchApiKey` / `webSearchBaseUrl` —— 官方那套词在 `settings.models` / `settings.plugins` 命名空间、别的插件拿不到，所以抄进 [../locales.ts](../locales.ts)。
-- **端点基址默认留空**：界面显示空串（官方卡片同款），填空即覆盖、留空即官方默认；空串到官方地址的翻译只有 [../../config.ts](../../config.ts) 的 `endpointOf` 一处。
-- 只读凭据行的四档只有一个判据：[use-credential-state.ts](use-credential-state.ts) 的 `credentialViewOf`（覆盖 > 环境 > 配没配）。**不许在组件里另写一份分支。**
-- **读宿主新增字段必须先过形状守卫**：客户端半边由 HMR 立刻换新，宿主半边要重启才换。见 [../data.ts](../data.ts) 的 `readCredential` 与 [use-credential-state.ts](use-credential-state.ts)。
+  **常态显示组图标、悬停时换成箭头、展开与收起都保持** —— 这是原语自带的
+  （`previewChevron` 默认为 `expandable`，见官方 `DisclosureRow.module.css` 的
+  `.iconIdle` / `.chevronHover`），**不要自己写一套**。图标只在 [../icons.ts](../icons.ts) 选，不在 JSX 里硬编码。
+- **连接组是只读状态展示**（3.0）：两条途径各一行（`SourceRow`），配一个**真打上游**的测试按钮。
+  这里从前是一列输入框，全被删掉了 —— 理由见
+  [决策记录](../../../.agents/notes/2026-10-15-drop-apikey-field.md)：
+  接口地址只服务官方（等于没有第二个取值）、密钥框根本不能填（跟随官方）、
+  引用名 99% 的人不需要改（默认即官方那个）。
+  **二级「自定义设置」折叠连同它一起删了**，不要再加回来。
+- 凭据状态**判据住在后端**：[../../http/handlers.ts](../../http/handlers.ts) 的 `handleSources`
+  （由 [../../services/sources-service.ts](../../services/sources-service.ts) 组装）。
+  客户端这边只渲染，**不许在组件里另写一份分支** —— 从前那套四档判定
+  （`use-credential-state.ts` 的 `credentialViewOf`）已随本轮删除。
+- **掩码是首尾片段**（`sk-cf08d*****3b84`），形态与平台控制台 `platform.deepseek.com/api_keys` 一致；
+  **完整密钥永不跨线**，后端解析出明文后立刻折成掩码再丢掉。
+  星号个数固定 5 个 —— 真实长度本身也是信息。见 [../../domain/credential.ts](../../domain/credential.ts)。
+- **读宿主新增字段必须先过形状守卫**：客户端半边由 HMR 立刻换新，宿主半边要重启才换。
+  见 [../data.ts](../data.ts) 的 `readKeySource` / `readAccountSource`。
 - 错误文本用 `var(--dsw-alias-state-error-primary)`；官方 `--dsw-alias-label-error` 从未定义，照抄会静默失效。
 - 选择器触发 pill 没有公共组件，取值照抄 `packages/client/locale/src/client/LanguageRow.module.css:28-51`。
 - `set` / `unset` / `mutate` 的返回值不许丢弃：它就是**宿主是否接受**（`Promise<boolean>`），

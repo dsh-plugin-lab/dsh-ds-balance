@@ -37,8 +37,8 @@ A status ring is pinned to the bottom of the sidebar; clicking it shows the actu
 
 The balance is read directly from the official DeepSeek API, not estimated from usage.
 
-- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file and is never returned to the UI.
-- The configuration endpoint answers with only a fixed-length mask for the key, not even its last characters; a key is never logged and never written to any file of this plugin.
+- The credential is resolved through DSH's credential channel; the plugin stores no key of its own: a key never lands in a settings file, and the UI only ever sees a head-and-tail mask (`sk-cf08d*****3b84`) — never the full value.
+- The UI only ever sees a **head-and-tail mask** (`sk-cf08d*****3b84`, the same shape the DeepSeek platform console uses); **the full key never crosses the wire**, is never logged, and is never written to any file of this plugin.
 - Only `api.deepseek.com` is contacted; no other traffic is proxied or forwarded.
 - Balance snapshots are stored per credential — **changing the key starts keeping records afresh**, so old figures are never mixed in.
 
@@ -113,9 +113,9 @@ The card lives on the Plugins page: sidebar **Plugins** → "Installed" → clic
   <em>The Plugins page: this plugin's card sits under "Installed"; click it to open the details page. The small ring at the bottom of the left-hand bar is the status ring.</em>
 </p>
 
-The configuration area is on the details page, right below the description, ready to edit. All four groups start collapsed:
+The configuration area is on the details page, right below the description, ready to edit. **Connection** starts expanded; the other three start collapsed:
 
-- **Connection** — the API address and the credential. Both are blank by default: a blank address means the official endpoint; the credential inherits the one from the official model page and is read-only. The nested "Customized settings" holds only the credential reference name.
+- **Connection** — a read-only view of the two balance sources, plus a **Test both sources** button that really calls the provider. **API key** shows the reference name, where the value comes from (saved credentials or an environment variable) and a head-and-tail mask (`sk-cf08d*****3b84`); **Account sign-in** shows the avatar, display name and masked contact of the signed-in account. Nothing here is editable — the key and the account both follow the official Models page, and the endpoint is bound to the official one.
 - **Display** — which currency amounts use, or let it follow the account.
 - **Thresholds** — two lines per currency: a warning threshold and a critical threshold. Within one currency the **critical value must stay below the warning value**; saving is blocked otherwise.
 - **Refresh** — the server refresh interval, the UI poll interval and the manual refresh cooldown; the defaults suit most setups.
@@ -125,10 +125,10 @@ Saving applies immediately; there is no need to restart DSH.
 <p align="center">
   <img src="assets/settings-card_en.png" alt="DeepSeek Balance details page: the four configuration groups below the description" width="360">
   <br>
-  <em>The configuration area on the details page, pictured with the four groups expanded; they start collapsed and expand from their headers. A group with an invalid entry expands itself.</em>
+  <em>The configuration area on the details page. Connection opens by default; a group with an invalid entry expands itself.</em>
 </p>
 
-> **Upgrade note**: the keys these settings are filed under changed once with a host upgrade, and **old values are not migrated**; after upgrading, fill the four groups in again as above.
+> **Upgrade notes**: the keys these settings are filed under changed once with a host upgrade, and **old values are not migrated**; after upgrading, fill the four groups in again as above. Separately, **version 3.0 removed two settings**: a hand-written `apiKey` and a custom `baseUrl` now have no effect — the credential is the one the official Models page holds, and the endpoint is the official one. Remove them from your settings file if you had set them by hand.
 
 ## Version compatibility
 

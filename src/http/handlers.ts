@@ -22,7 +22,9 @@ import type { BalanceService } from '../services/balance-service.js'
 import type { ConfigService } from '../services/config-service.js'
 import type { KeyResolver } from '../services/key-resolver.js'
 import type { Scheduler } from '../services/scheduler.js'
-import { CONFIG_FIELDS, endpointOf, validateThresholds, type Config } from '../config.js'
+import type { SourcesService } from '../services/sources-service.js'
+import type { AccountSource } from '../ports/account.js'
+import { CONFIG_FIELDS, ENDPOINT, validateThresholds, type Config } from '../config.js'
 import { PLUGIN_VERSION, SCHEMA_VERSION } from '../version.js'
 import {
   newRequestId,
@@ -45,6 +47,13 @@ export interface HttpDeps {
   metrics?: ReadableMetrics | undefined
   /** 凭据端口。只用来读「配没配 / 可不可写」，**永远不读值**。 */
   credentials?: Credentials | undefined
+  /** 两条取数途径的状态。`GET /api/v1/sources` 的唯一来源。 */
+  sources: SourcesService
+  /**
+   * 取当前账号端口实现；服务可能晚到，所以是函数而不是实例。
+   * `POST /api/v1/test-connection` 的 `source: 'deepseek-account'` 那条路用它。
+   */
+  account: () => AccountSource | undefined
 }
 
 /** `testConnection` 超时的可接受区间；越界一律回落默认值。 */
@@ -120,24 +129,6 @@ function failureView(
     todayUsage: null,
     error: toWireError(classify(error)),
   }
-}
-
-/** 从配置里挑出 `GET /api/v1/config` 要回传的字段。**`apiKey` 永不出现在这里。** */
-function publicConfig(config: Config): Omit<Config, 'apiKey'> {
-  const { apiKey: _secret, ...rest } = config
-  return rest
-}
-
-/**
- * `apiKey` 的掩码。
- *
- * **不回传密钥的任何片段**：只回答「配没配」。回一个固定长度的星号串是为了让
- * 字段名 `apiKeyMasked` 名副其实，同时不给任何爆破线索。
- * @param value - 当前生效的 `apiKey`。
- * @returns 已配置时是固定长度的掩码串，未配置时是空串。
- */
-function maskApiKey(value: string): string {
-  return value.trim() === '' ? '' : '********'
 }
 
 /** `GET /api/v1/balance`。**状态码始终 200**，业务错误走 `state` + `error`。 */
@@ -216,21 +207,25 @@ async function credentialInfo(deps: HttpDeps, ref: string): Promise<WireCredenti
   }
 }
 
-/** 组装配置响应体。**`apiKey` 永不出现；掩码是手动的。** */
+/**
+ * 组装配置响应体。
+ *
+ * **配置整份回传**：9 个字段里没有一个是秘密（密钥在 3.0 随 `apiKey` 字段一起删了），
+ * 所以不再需要从前那个「挑字段 + 手动掩码」的包装。掩码现在归 `GET /api/v1/sources`。
+ */
 async function configBody(requestId: string, deps: HttpDeps): Promise<Record<string, unknown>> {
   const config = deps.config.current()
   return {
     requestId,
     schemaVersion: SCHEMA_VERSION,
-    config: publicConfig(config),
-    apiKeyMasked: maskApiKey(config.apiKey),
+    config,
     credential: await credentialInfo(deps, config.apiKeyRef),
     timeoutMs: deps.config.timeoutMs(),
     error: null,
   }
 }
 
-/** `GET /api/v1/config`。**掩码是手动的** —— 本响应自己构造，不走 settings 读取。 */
+/** `GET /api/v1/config`。 */
 export async function handleConfigGet(_request: Request, deps: HttpDeps): Promise<Response> {
   const requestId = newRequestId()
   try {
@@ -241,6 +236,44 @@ export async function handleConfigGet(_request: Request, deps: HttpDeps): Promis
       error: describeError(error),
     })
     return json({ requestId, schemaVersion: SCHEMA_VERSION, error: toWireError(classify(error)) })
+  }
+}
+
+/**
+ * `GET /api/v1/sources`。
+ *
+ * 「连接」组的唯一事实出口：两条途径的状态一次给全。`?refresh=1` 强制重读
+ * （卡片打开 / 窗口重新获得焦点 / 点测试按钮时用），否则走缓存。
+ *
+ * **失败也回 200 + 一份保守快照**：界面读不到状态时该显示「未确认」，
+ * 而不是让整张卡片消失（与 `credential` 段同一策略）。
+ */
+export async function handleSources(request: Request, deps: HttpDeps): Promise<Response> {
+  const requestId = newRequestId()
+  const force = queryParam(request, 'refresh') === '1'
+  try {
+    const snapshot = force ? await deps.sources.refresh() : await deps.sources.snapshot()
+    return json({
+      requestId,
+      schemaVersion: SCHEMA_VERSION,
+      revision: snapshot.revision,
+      key: snapshot.key,
+      account: snapshot.account,
+    })
+  } catch (error) {
+    deps.logger?.error('ds-balance: sources handler failed', {
+      requestId,
+      error: describeError(error),
+    })
+    // 保守快照：两条途径都说「读不到」。`revision: -1` 是一个界面认得出「这份不可信」的值。
+    return json({
+      requestId,
+      schemaVersion: SCHEMA_VERSION,
+      revision: -1,
+      key: { ref: '', configured: false, source: null, masked: '', tag8: '' },
+      account: { available: false, signedIn: false, name: null, avatarUrl: null, contact: null },
+      error: toWireError(classify(error)),
+    })
   }
 }
 
@@ -301,17 +334,70 @@ export async function handleConfigUpdate(request: Request, deps: HttpDeps): Prom
   }
 }
 
-/** `POST /api/v1/test-connection`。**不动活动缓存。** */
+/**
+ * `POST /api/v1/test-connection`。**不动活动缓存。**
+ *
+ * 请求体 `{ source?, apiKey?, timeoutMs? }`。
+ * - `source` 省略或 `deepseek-http`（默认）：走官方余额端点，行为与从前逐字相同；
+ * - `source: 'deepseek-account'`：走账号那条路真读一次钱包。
+ *
+ * **真连一次上游**，回真实的 `latencyMs`。这正是它存在的意义 ——
+ * 界面上的「测试两条途径」按钮读的就是这里，而不是本地字符串检查。
+ *
+ * **余额预览不在这里**：卡片按 [settings/AGENTS.md](../client/settings/AGENTS.md)
+ * 不许出现任何额度信息，所以账号那条只回成败与延迟，不回钱包内容。
+ */
 export async function handleTestConnection(request: Request, deps: HttpDeps): Promise<Response> {
   const requestId = newRequestId()
   try {
     const body = await readJsonObject(request)
-    const config = deps.config.current()
-    const rawBaseUrl = body?.baseUrl
-    const baseUrl =
-      typeof rawBaseUrl === 'string' && rawBaseUrl.trim() !== ''
-        ? rawBaseUrl.trim()
-        : endpointOf(config)
+    const rawSource = body?.source
+    const source = rawSource === 'deepseek-account' ? 'deepseek-account' : 'deepseek-http'
+
+    if (source === 'deepseek-account') {
+      const account = deps.account()
+      if (account === undefined) {
+        return json({
+          requestId,
+          schemaVersion: SCHEMA_VERSION,
+          source,
+          ok: false,
+          latencyMs: 0,
+          code: 'NO_KEY',
+          message: 'account service is not available',
+        })
+      }
+      const startedAt = Date.now()
+      try {
+        const balance = await account.readBalance()
+        const latencyMs = Date.now() - startedAt
+        if (balance === null) {
+          return json({
+            requestId,
+            schemaVersion: SCHEMA_VERSION,
+            source,
+            ok: false,
+            latencyMs,
+            code: 'NO_KEY',
+            message: 'account is not signed in',
+          })
+        }
+        return json({ requestId, schemaVersion: SCHEMA_VERSION, source, ok: true, latencyMs })
+      } catch (error) {
+        const latencyMs = Date.now() - startedAt
+        const info = classify(error)
+        return json({
+          requestId,
+          schemaVersion: SCHEMA_VERSION,
+          source,
+          ok: false,
+          latencyMs,
+          code: info.code,
+          message: info.message,
+        })
+      }
+    }
+
     const rawTimeout = Number(body?.timeoutMs)
     const timeoutMs =
       Number.isFinite(rawTimeout) &&
@@ -325,9 +411,17 @@ export async function handleTestConnection(request: Request, deps: HttpDeps): Pr
         ? rawApiKey.trim()
         : await deps.keys.resolve().catch((): null => null)
     if (apiKey === null)
-      return json({ requestId, ok: false, latencyMs: 0, code: 'NO_KEY', message: NO_KEY_MESSAGE })
-    const result = await deps.client.testConnection({ baseUrl, apiKey, timeoutMs })
-    return json({ requestId, schemaVersion: SCHEMA_VERSION, ...result })
+      return json({
+        requestId,
+        schemaVersion: SCHEMA_VERSION,
+        source,
+        ok: false,
+        latencyMs: 0,
+        code: 'NO_KEY',
+        message: NO_KEY_MESSAGE,
+      })
+    const result = await deps.client.testConnection({ baseUrl: ENDPOINT, apiKey, timeoutMs })
+    return json({ requestId, schemaVersion: SCHEMA_VERSION, source, ...result })
   } catch (error) {
     deps.logger?.warn('ds-balance: test-connection handler failed', {
       requestId,
@@ -337,6 +431,7 @@ export async function handleTestConnection(request: Request, deps: HttpDeps): Pr
     return json({
       requestId,
       schemaVersion: SCHEMA_VERSION,
+      source: 'deepseek-http',
       ok: false,
       latencyMs: 0,
       code: info.code,

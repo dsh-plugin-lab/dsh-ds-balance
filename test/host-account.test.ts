@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAccountSource, type HostAccountFace } from '../src/adapters/host-account.ts'
 import { AppError } from '../src/domain/errors.ts'
 
-/** 宿主服务的替身：只实现用到的三个方法。 */
+/** 宿主服务的替身：只实现用到的方法。 */
 function face(patch: Partial<HostAccountFace> = {}): HostAccountFace {
   return {
     getState: vi.fn().mockResolvedValue({ status: 'credential-stored' }),
+    getProfile: vi.fn().mockResolvedValue(null),
     getBalance: vi.fn().mockResolvedValue({ status: 'ready', value: [], bonusWallets: [] }),
     getPlatformSession: vi.fn().mockResolvedValue({ userId: 'user-1' }),
     ...patch,

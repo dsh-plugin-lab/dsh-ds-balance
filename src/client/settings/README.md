@@ -14,12 +14,16 @@
 - 职责：卡片本体。持有分组展开一份局部状态；把 `useConfigForm` 的状态翻译成 JSX。
 - 关键导出：`BalanceSettingsCard`、`BalanceSettingsCardProps`，并转发 `ConfigFormOf`（对官方 `ConfigForm<Record<string, unknown>>` 的收窄别名）。
 - 分组：连接 → 展示 → 阈值 → 刷新。这是 UI 的排列顺序（按使用频率）；宿主 `Config` 的字段顺序是 连接 → 刷新 → 展示 → 阈值，**两者有意不同**，见 [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) 的关键决策。
-- 连接组是**两段式**：外面是只读的凭据状态（`ReadOnlyControl`，继承官方、不可改）与可编辑的 Base URL；二级「自定义设置」折叠里只有**凭据引用名**（`apiKeyRef`，默认收起）。
-  **界面上唯一的 API Key 就是那个只读框** —— 卡片不再提供填 Key 的入口；Key 仍可由配置文件给出，所以 schema 与写入面没动。
-- 默认收起：四组全收起（`DEFAULT_GROUP_OPEN` 全 `false`）—— 进页面先看到四个组名，需要哪组点开哪组；展开状态不持久化，重挂载即回到全收起。
+- 连接组是**只读状态展示**（3.0）：两条途径各一行（`SourceRow`）—— API Key 与账号登录 ——
+  配一个**真打上游**的测试按钮。这里从前是一列输入框（只读凭据框 + Base URL + 二级折叠里的引用名），
+  全被删掉了：接口地址只服务官方（等于没有第二个取值）、密钥框根本不能填（跟随官方）、
+  引用名 99% 的人不需要改。**二级「自定义设置」折叠连同它一起删了**，不要再加回来。
+  理由与替代方案 → [决策记录](../../../.agents/notes/2026-10-15-drop-apikey-field.md)。
+- **连接组默认展开**（`DEFAULT_GROUP_OPEN.connection = true`）：它是这张卡片的第一件事 ——
+  用户点进来看的就是「现在通不通」，而它只有两行状态加一个按钮。其余三组默认收起。
 - 组内有非法草稿时该组强制展开（`groupOpenNow`），否则 footer 的「请检查标红的字段」会指向一个收起来的组。
 - 被谁依赖：`src/client/index.tsx` 的 `SettingsSeatComponent`。
-- 改后必测：四组各自展开与收起；暂存与保存；非法数字禁用保存；测试连接的三种结果。
+- 改后必测：四组各自展开与收起；暂存与保存；非法数字禁用保存；两条途径的状态行与测试结果。
 
 ### BalanceSettingsCard.module.css
 
@@ -33,13 +37,13 @@
 
 ### fields.tsx
 
-- 职责：字段行的容器与全部控件，以及分组的折叠头。
-- 关键导出：`FieldGroup`、`FieldFrame`、`FieldBadges`、`TextControl`、`ReadOnlyControl`、`SelectorControl`、`ActionRow`、`DetailsGroup`，以及类型 `FieldStatus` 与 `SelectorOption`。
+- 职责：字段行的容器与全部控件，以及分组的折叠头与取数途径的状态行。
+- 关键导出：`FieldGroup`、`FieldFrame`、`FieldBadges`、`TextControl`、`SelectorControl`、`ActionRow`、`SourceRow`，以及类型 `FieldStatus`、`SourceStatus`、`SelectorOption`。
 - `FieldGroup` 的折叠头用原语 `DisclosureRow`，不自己画；展开体由原语在 open 时条件渲染，无动画。
-- `ReadOnlyControl` 是只读输入：字段照常渲染、**只 `readOnly` 不 `disabled`**（常态空框，不降透明度），**框内不写任何文字**，形态照官方「网页搜索」卡片的凭据字段。只读的因由由标签行右侧的状态徽章与它下方的说明行承担，两处文案都来自词典。
-  **交互一律不响应**（`fields.module.css` 的 `input.inputStatic`，含 `pointer-events: none`）：悬停不换描边、指针是普通箭头不是插入符、点了也不出焦点环 —— 看着像能编辑才是错的。
-- 凭据徽章只有两态（已配置密钥。/ 未配置密钥。），与官方「网页搜索」卡片一致；四档判据（覆盖 > 环境 > 配没配）只决定二级折叠里那两个字段的状态。
-- `DetailsGroup` 是**二级折叠**，用原生 `<details>`/`<summary>` 而不是 `DisclosureRow` —— 官方那一处也是原生 details 配一个 `::before` 折角。它是受控但跟手的：`open` 由 state 持有，用户拨动时从 DOM 读回真实状态，卡片重渲染不会把它弹回去。
+  **常态显示组图标、悬停换成箭头**由原语自带（`previewChevron`），不要自己写一套。
+- `SourceRow` 是**只读状态行**（不是表单字段）：状态点 + 名称 + 右侧徽标 + 一行事实 + 一句说明 + 可选测试结果。
+  状态点逐值抄官方 `ui-settings-models` 的 `.credentialDot`（8×8、`corner-shape: round`）。
+  它不接 `form`，没有草稿也没有撤销。
 - 类名拼接统一用官方 `clsx`（平台样式规则要求），不自备工具函数。
 - 被谁依赖：`BalanceSettingsCard.tsx`。
 - 改后必测：数字字段仍是 `type="text"` + `inputMode="numeric"`；选择器仍是 pill + `Menu`；`FieldFrame` 在没有 hint 时不渲染说明行。
@@ -51,20 +55,34 @@
 - 被谁依赖：`fields.tsx`；`BalanceSettingsCard.tsx` 另用它的 `.field` 包住测试连接那一行。
 - 改后必测：新增元素的纵向间距必须落在 12px 这一档；中性实线边框 0.5px、状态色边框 1px；控件圆角走 `--dsw-radius-*`（**裸引，不写回落** —— 声明的那条线上它们一定存在）、**不写** `corner-shape`（继承宿主全局 superellipse）；只有必须是真的圆才成对写 `50%` + `corner-shape: round`。
 
-### use-credential-state.ts
+### use-sources.ts
 
-- 职责：问 `GET /api/v1/config` 要凭据的三个事实（`configured` / `source` / `writable`），决定只读凭据行显示哪一档。
-- 关键导出：`useCredentialState(ref)`（返回 `CredentialInfo | null`）、`credentialViewOf(credential, overridden)` 与类型 `CredentialView`。
-- `credentialViewOf` 是四档的唯一判据，优先级是 覆盖 > 环境 > 配没配；**组件里不许另写一份分支**。
-- **读不到一律当 `null`**：宿主旧版本、请求失败、字段缺失都走这一条，绝不把 `undefined` 漏进组件（否则卡片会崩、整个 slot 条目消失）。
-- 引用名一变就重读一次；用的是**生效**引用名，草稿未保存时后端认的仍是存下来的那个。
+- 职责：订阅两条取数途径的状态（`GET /api/v1/sources`），**一处读、一处判**。
+- 关键导出：`useSources(enabled)` → `{ sources, loading, refresh }`。
+- **判据住在后端**：这个 hook 只负责读与转发，不做任何分档判断 ——
+  分档在 [../../services/sources-service.ts](../../services/sources-service.ts)（后端），
+  由 [../../http/handlers.ts](../../http/handlers.ts) 的 `handleSources` 出线。
+  它替换了从前那个四档判定模块 `use-credential-state.ts`（已删）。
+- **三个读取时机**：挂载 · 窗口重新获得焦点 · 手动 `refresh()`（点测试按钮时顺带）。
+  **不轮询**：凭据是低频变化的东西，卡片是低频界面。
+  焦点那条正是「去官方模型页换了 key 再回来」的落点 —— 靠它就不必给客户端加 `remote` 依赖。
+- **读失败不抛**：保持上一次的快照（首帧是保守快照），界面显示「未确认」而不是让卡片消失。
 - 被谁依赖：`BalanceSettingsCard.tsx`。
-- 改后必测：宿主回旧结构时卡片仍渲染（读不到一律当「环境提供」）；四档的优先级有专门用例，见 [test/use-credential-state.test.ts](../../../test/use-credential-state.test.ts)。
+- 改后必测：`enabled` 为假时不发请求；失败时不清空已有状态；见 [test/client-data.test.ts](../../../test/client-data.test.ts) 的形状守卫用例。
+
+### AccountAvatar.tsx
+
+- 职责：账号头像。规格逐值照官方 `ui-settings-account` 的 `AccountAvatar.module.css`
+  与 `AccountSection.module.css` 的 `.avatar`（32×32、`50%` + `corner-shape: round`、
+  `object-fit: cover`、底色 `--dsw-alias-bg-skeleton`），`referrerPolicy="no-referrer"`。
+- **加载失败回落成空圆底**，不显示碎图；URL 变了（换账号）会清掉失败标记。
+- 只在**账号那行**渲染：API Key 没有身份可言，不给它画占位头像。
+- 被谁依赖：`BalanceSettingsCard.tsx`。
 
 ### use-config-form.ts
 
-- 职责：字段规格表、草稿状态机、保存与读回判定，以及「测试连接」的本地模拟。
-- 关键导出：`useConfigForm`、`writeFieldValue`、`ConfigFormOf`、`CONFIG_FIELDS`、`SPEC_BY_FIELD`、`FieldState`、`ConfigFormState`、`TestState`、`ConfigFormApi`、`textField` / `numberField` / `selectField`、`currencyCodes`、`AUTO_CURRENCY`、`KNOWN_CURRENCIES`、`probeFailure`、`TEST_LATENCY_MS`、`THRESHOLD_PAIRS`、`thresholdsOk`。
+- 职责：字段规格表、草稿状态机、保存与读回判定。
+- 关键导出：`useConfigForm`、`writeFieldValue`、`ConfigFormOf`、`CONFIG_FIELDS`、`SPEC_BY_FIELD`、`FieldState`、`ConfigFormState`、`ConfigFormApi`、`textField` / `numberField` / `selectField`、`currencyCodes`、`AUTO_CURRENCY`、`KNOWN_CURRENCIES`、`THRESHOLD_PAIRS`、`thresholdsOk`。
 - **成对校验**：`thresholdsOk` 判「同一币种内告急 < 预警」，草稿为空时按**默认值**算（不是旧值），
   所以 `THRESHOLD_PAIRS` 里存了一份默认值 —— 两个半体不许值导入，这份抄写由 [test/threshold-pairs.test.ts](../../../test/threshold-pairs.test.ts) 对着宿主 schema 对账。
 - **保存是一次原子提交**：`form.mutate(ops, revision)` 把全部字段放进同一道修订栅栏、一次宿主校验、一次落盘决定，

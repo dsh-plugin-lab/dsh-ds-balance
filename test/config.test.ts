@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { endpointOf } from '../src/config.ts'
 import {
   DEFAULT_TIMEOUT_MS,
+  ENDPOINT,
   TIMEOUT_ENV,
   resolveThresholdPairs,
   resolveTimeoutMs,
@@ -12,9 +12,7 @@ import { DEFAULT_BASE_URL } from '../src/ports/deepseek-client.ts'
 /** 一份合法的纯值配置；各用例只覆写关心的字段。 */
 function configOf(patch: Partial<Config> = {}): Config {
   return {
-    apiKey: '',
     apiKeyRef: 'DEEPSEEK_API_KEY',
-    baseUrl: '',
     serverRefreshSeconds: 60,
     clientPollSeconds: 30,
     manualRefreshCooldownSeconds: 30,
@@ -101,14 +99,20 @@ describe('resolveThresholdPairs', () => {
   })
 })
 
-describe('endpointOf', () => {
-  it('留空用官方默认地址 —— 界面默认就是空的', () => {
-    expect(endpointOf({ baseUrl: '' })).toBe(DEFAULT_BASE_URL)
-    expect(endpointOf({ baseUrl: '   ' })).toBe(DEFAULT_BASE_URL)
+/**
+ * 端点是一个常量，不再是配置项（3.0 起删掉了 `baseUrl`）。
+ *
+ * 这条断言钉的是**它等于官方根地址**：本插件打的是 `GET {root}/user/balance`，
+ * 而官方的 `DEEPSEEK_BASE_URL` 是 Messages 根地址（`.../anthropic`）——
+ * 两者拼法不同，所以端点必须是我们自己这个常量，不能跟着那个环境变量走。
+ */
+describe('ENDPOINT', () => {
+  it('就是官方根地址，且与端口层的默认值同源', () => {
+    expect(ENDPOINT).toBe(DEFAULT_BASE_URL)
+    expect(ENDPOINT).toBe('https://api.deepseek.com')
   })
 
-  it('填了就用填的，顺手去掉尾部斜杠带来的空白', () => {
-    expect(endpointOf({ baseUrl: ' https://proxy.example.com ' })).toBe('https://proxy.example.com')
-    expect(endpointOf({ baseUrl: 'https://proxy.example.com' })).toBe('https://proxy.example.com')
+  it('**不是** Messages 根地址（拼法不同，照抄会打错路径）', () => {
+    expect(ENDPOINT).not.toContain('/anthropic')
   })
 })

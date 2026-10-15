@@ -13,7 +13,7 @@
  * @module dsh-ds-balance/client/settings/use-config-form
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /** 配置表单的键域：11 个字段都是标量，按普通对象收窄。 */
@@ -232,16 +232,6 @@ export interface ConfigFormState {
   readonly failed: boolean
 }
 
-/** 测试连接的状态。 */
-export interface TestState {
-  /** 是否正在测试。 */
-  readonly running: boolean
-  /** 结果；未出结果时为 null。 */
-  readonly ok: boolean | null
-  /** 失败原因；成功或未出结果时为空串。 */
-  readonly message: string
-}
-
 /** 表单暴露给卡片的面。 */
 export interface ConfigFormApi {
   /** 整体状态。 */
@@ -264,33 +254,18 @@ export interface ConfigFormApi {
   touched(field: string): boolean
   /** 记一次失焦。 */
   touch(field: string): void
-  /** 测试连接状态。 */
-  readonly test: TestState
-  /** 跑一次本地模拟的连接测试。 */
-  runTest(): void
 }
-
-/** 本地模拟的连接测试耗时。 */
-export const TEST_LATENCY_MS = 800
 
 /**
- * 判定一次模拟连接测试是否失败。
- * 规则：Base URL **留空合法**（走官方默认地址），非空时必须以 http:// 或 https:// 开头；
- * API Key 与引用名不能同时为空。
- * 返回的是宿主诊断风格的英文短句，与官方卡片直接展示宿主诊断的做法一致。
- * @param baseUrl - 当前草稿或生效的 Base URL。
- * @param apiKey - 当前草稿或生效的 API Key。
- * @param apiKeyRef - 当前草稿或生效的引用名。
- * @returns 失败原因；可通过时为 null。
+ * 从前这里还有一套「测试连接」的本地模拟（`TestState` / `runTest` / `TEST_LATENCY_MS` /
+ * `probeFailure`），**3.0 整块删掉**：它做的是本地字符串检查 + 800ms 假延迟 + 显示「连接正常。」，
+ * 一次网络请求都不发 —— 而后端那个真端点 `POST /api/v1/test-connection` 早就写好、
+ * 也有用例守着，客户端一处都没调它。
+ *
+ * 现在测试由卡片直接打真端点（[use-sources.ts](use-sources.ts) 的 `refresh` 与
+ * [BalanceSettingsCard.tsx](BalanceSettingsCard.tsx) 的 `runTest`）。
+ * 留着那套假模拟只会给出「这个按钮真的连过」的假信号。
  */
-export function probeFailure(baseUrl: string, apiKey: string, apiKeyRef: string): string | null {
-  const url = baseUrl.trim()
-  if (url !== '' && !/^https?:\/\//i.test(url))
-    return 'base URL must start with http:// or https://'
-  if (apiKey.trim() === '' && apiKeyRef.trim() === '')
-    return 'no API key or credential reference configured'
-  return null
-}
 
 /** 一次待写入的编辑。 */
 type StagedEdit =
@@ -570,18 +545,6 @@ export function useConfigForm(form: ConfigFormOf): ConfigFormApi {
   /** 已经失焦过的字段。成对校验的提示在失焦后才出现，免得打字中途闪一下。 */
   const [blurred, setBlurred] = useState<ReadonlySet<string>>(() => new Set<string>())
   const savingRef = useRef(false)
-  const [test, setTest] = useState<TestState>({ running: false, ok: null, message: '' })
-  const testTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const testRunningRef = useRef(false)
-
-  useEffect(
-    () => () => {
-      if (testTimerRef.current !== null) clearTimeout(testTimerRef.current)
-      testTimerRef.current = null
-      testRunningRef.current = false
-    },
-    [],
-  )
 
   const plan = useMemo(() => planWrites(snapshot, staged), [snapshot, staged])
   // 成对校验按**草稿**判，所以必须和 field() 看同一份状态；它也算进整体 invalid，
@@ -608,15 +571,6 @@ export function useConfigForm(form: ConfigFormOf): ConfigFormApi {
       return next
     })
     setFailed(false)
-    // 草稿一变，上一次的连接测试结论就不再描述当前值：清掉，免得旧结果留在屏幕上。
-    if (testTimerRef.current !== null) {
-      clearTimeout(testTimerRef.current)
-      testTimerRef.current = null
-    }
-    testRunningRef.current = false
-    setTest((current) =>
-      current.running || current.ok !== null ? { running: false, ok: null, message: '' } : current,
-    )
   }, [])
 
   const edit = useCallback(
@@ -643,15 +597,6 @@ export function useConfigForm(form: ConfigFormOf): ConfigFormApi {
   const discard = useCallback(() => {
     setStaged((current) => (current.size === 0 ? current : new Map()))
     setFailed(false)
-    // 弃稿后表单回到生效值，上一次的连接测试结论也不再描述屏幕上的内容。
-    if (testTimerRef.current !== null) {
-      clearTimeout(testTimerRef.current)
-      testTimerRef.current = null
-    }
-    testRunningRef.current = false
-    setTest((current) =>
-      current.running || current.ok !== null ? { running: false, ok: null, message: '' } : current,
-    )
   }, [])
 
   const save = useCallback(async (): Promise<void> => {
@@ -685,29 +630,6 @@ export function useConfigForm(form: ConfigFormOf): ConfigFormApi {
     if (landed) setStaged(new Map())
     setFailed(!landed)
   }, [form, readSnapshot, staged])
-
-  const runTest = useCallback((): void => {
-    if (testRunningRef.current) return
-    const current = readSnapshot()
-    const draftOf = (field: string): string => {
-      const spec = SPEC_BY_FIELD.get(field)
-      const edit = staged.get(field)
-      if (edit !== undefined && edit.kind === 'text') return edit.text
-      return spec !== undefined && isTextSpec(spec) ? spec.format(current.value[field]) : ''
-    }
-    const failure = probeFailure(draftOf('baseUrl'), draftOf('apiKey'), draftOf('apiKeyRef'))
-    testRunningRef.current = true
-    setTest({ running: true, ok: null, message: '' })
-    testTimerRef.current = setTimeout(() => {
-      testTimerRef.current = null
-      testRunningRef.current = false
-      setTest(
-        failure === null
-          ? { running: false, ok: true, message: '' }
-          : { running: false, ok: false, message: failure },
-      )
-    }, TEST_LATENCY_MS)
-  }, [readSnapshot, staged])
 
   const field = useCallback(
     (name: string): FieldState => fieldOf(snapshot, name, staged.get(name)),
@@ -754,7 +676,5 @@ export function useConfigForm(form: ConfigFormOf): ConfigFormApi {
     thresholdPairOk,
     touched,
     touch,
-    test,
-    runTest,
   }
 }

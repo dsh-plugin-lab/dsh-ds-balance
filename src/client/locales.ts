@@ -64,9 +64,6 @@ export const zh = {
   'settings.group.refresh': '刷新',
   'settings.group.display': '展示',
   'settings.group.thresholds': '阈值',
-  'settings.field.apiKey': 'API Key',
-  'settings.field.apiKeyRef': 'API 密钥引用名',
-  'settings.field.baseUrl': '接口地址',
   'settings.field.serverRefreshSeconds': '服务端刷新频率（秒）',
   'settings.field.clientPollSeconds': '客户端轮询频率（秒）',
   'settings.field.manualRefreshCooldownSeconds': '手动刷新冷却（秒）',
@@ -75,8 +72,36 @@ export const zh = {
   'settings.field.cnyCritical': 'CNY 告急',
   'settings.field.usdWarn': 'USD 预警',
   'settings.field.usdCritical': 'USD 告急',
-  'settings.hint.apiKeyRef': '凭据存储里的条目名；非空时优先于 API Key。',
-  'settings.hint.baseUrl': '留空则使用提供方默认地址。',
+
+  // ── 「连接」组：两条取数途径的只读状态 ──────────────────────────
+  // 措辞逐条对齐官方：账号那几句取自 ui-settings-account 的 signedIn / signedOut /
+  // profileUnavailable；密钥那几句取自 ui-settings-models 的 apiKeySet / apiKeyUnset。
+  // 官方那套词在 settings.account / settings.models 命名空间，别的插件拿不到，所以抄进来。
+  'settings.sources.title': '取数途径',
+  'settings.sources.key': 'API Key',
+  'settings.sources.account': '账号登录',
+  // 状态徽章（两态，同官方「已配置密钥。/ 未配置密钥。」）
+  'settings.sources.keyConfigured': '已配置密钥。',
+  'settings.sources.keyNotConfigured': '未配置密钥。',
+  'settings.sources.accountSignedIn': '已登录 DeepSeek',
+  'settings.sources.accountSignedOut': '尚未登录',
+  'settings.sources.accountUnavailable': '账号资料暂不可用',
+  // 来源层：讲清这把 key 从哪来。取值来自官方 describe() 的 source。
+  'settings.sources.fromSaved': '已保存的凭据',
+  'settings.sources.fromEnv': '环境变量 {name}',
+  'settings.sources.unknown': '状态未确认',
+  // 说明行：一句，讲这条途径是什么，不重复标签。
+  'settings.sources.keyHint': '跟随官方模型页配好的凭据，或启动环境里的同名变量。',
+  'settings.sources.accountHint': '跟随宿主已登录的 DeepSeek 账号。',
+  'settings.sources.accountMissingHint': '本部署没有账号服务，这条途径不可用。',
+  // 测试
+  'settings.test': '测试两条途径',
+  'settings.testing': '正在测试…',
+  'settings.test.ok': '连接正常 · 延迟 {ms}ms',
+  'settings.test.noKey': '没有可用凭据',
+  'settings.test.notSignedIn': '尚未登录',
+  'settings.test.fail': '连接失败：{message}',
+
   'settings.hint.displayCurrency': '所选币种不存在时，回落到账户实际持有的币种。',
   'settings.hint.threshold': '后端判定；界面颜色跟随返回的严重度。',
   'settings.hint.thresholdPair': '告急值必须低于预警值',
@@ -84,18 +109,6 @@ export const zh = {
   'settings.hint.clientPollSeconds': '刷新显示的间隔；正常时只读缓存，读不到时才访问上游。',
   'settings.hint.manualRefreshCooldownSeconds': '两次手动刷新之间的最短间隔。',
   'settings.currency.auto': '自动（跟随账户）',
-  // 凭据行的**状态徽章**：两条逐字用官方措辞 —— 取自 ui-settings-plugins 的
-  // webSearchApiKeySet / webSearchApiKeyUnset（后者去掉搜索相关的后半句）。
-  'settings.credential.configured': '已配置密钥。',
-  'settings.credential.notConfigured': '未配置密钥。',
-  // 凭据行下方的说明。官方 webSearchApiKeyHint 是一句与状态无关的常量说明，这里照做：
-  // 状态由徽章交代，说明只讲字段契约。
-  'settings.hint.credential': '不写入设置文件。留空表示保持当前密钥。',
-  'settings.group.customized': '自定义设置',
-  'settings.test': '测试连接',
-  'settings.testing': '测试中…',
-  'settings.test.ok': '连接正常。',
-  'settings.test.fail': '连接失败：{message}',
   'settings.save': '保存',
   'settings.saving': '保存中…',
   'settings.failed': '保存失败，请重试。',
@@ -158,9 +171,6 @@ export const en: Record<LocaleKey, string> = {
   'settings.group.refresh': 'Refresh',
   'settings.group.display': 'Display',
   'settings.group.thresholds': 'Thresholds',
-  'settings.field.apiKey': 'API key',
-  'settings.field.apiKeyRef': 'API key reference',
-  'settings.field.baseUrl': 'Endpoint',
   'settings.field.serverRefreshSeconds': 'Server refresh (seconds)',
   'settings.field.clientPollSeconds': 'Client poll (seconds)',
   'settings.field.manualRefreshCooldownSeconds': 'Manual refresh cooldown (seconds)',
@@ -169,8 +179,31 @@ export const en: Record<LocaleKey, string> = {
   'settings.field.cnyCritical': 'CNY critical',
   'settings.field.usdWarn': 'USD warning',
   'settings.field.usdCritical': 'USD critical',
-  'settings.hint.apiKeyRef': 'Credential store entry name; takes precedence over the API key.',
-  'settings.hint.baseUrl': 'Leave blank to use the provider default.',
+
+  // 与 zh 逐条对应，理由写在 zh 那一段。
+  'settings.sources.title': 'Balance sources',
+  'settings.sources.key': 'API key',
+  'settings.sources.account': 'Account sign-in',
+  'settings.sources.keyConfigured': 'A key is configured.',
+  'settings.sources.keyNotConfigured': 'No key is configured.',
+  'settings.sources.accountSignedIn': 'Signed in to DeepSeek',
+  'settings.sources.accountSignedOut': 'Not signed in',
+  'settings.sources.accountUnavailable': 'Account details are not available yet.',
+  'settings.sources.fromSaved': 'Saved credentials',
+  'settings.sources.fromEnv': 'Env var {name}',
+  'settings.sources.unknown': 'Status unconfirmed',
+  'settings.sources.keyHint':
+    'Follows the credential saved on the official Models page, or the same-named variable in the launch environment.',
+  'settings.sources.accountHint': 'Follows the DeepSeek account signed in to the host.',
+  'settings.sources.accountMissingHint':
+    'This deployment ships no account service, so this source is unavailable.',
+  'settings.test': 'Test both sources',
+  'settings.testing': 'Testing…',
+  'settings.test.ok': 'Connection looks good · {ms}ms',
+  'settings.test.noKey': 'No credential available',
+  'settings.test.notSignedIn': 'Not signed in',
+  'settings.test.fail': 'Connection failed: {message}',
+
   'settings.hint.displayCurrency': 'Falls back to a currency the account actually holds.',
   'settings.hint.threshold': 'Decided on the server; the UI colour follows the returned severity.',
   'settings.hint.thresholdPair': 'Critical must be lower than warning',
@@ -178,15 +211,6 @@ export const en: Record<LocaleKey, string> = {
   'settings.hint.clientPollSeconds': 'How often the display refreshes; cache-only while healthy.',
   'settings.hint.manualRefreshCooldownSeconds': 'Minimum gap between two manual refreshes.',
   'settings.currency.auto': 'Automatic (follow account)',
-  'settings.credential.configured': 'A key is configured.',
-  'settings.credential.notConfigured': 'No key is configured.',
-  'settings.hint.credential':
-    'Stored outside the settings file. Leave blank to keep the current key.',
-  'settings.group.customized': 'Customized settings',
-  'settings.test': 'Test connection',
-  'settings.testing': 'Testing…',
-  'settings.test.ok': 'Connection looks good.',
-  'settings.test.fail': 'Connection failed: {message}',
   'settings.save': 'Save',
   'settings.saving': 'Saving…',
   'settings.failed': 'Saving failed. Try again.',

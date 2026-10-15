@@ -21,6 +21,12 @@ export const REFRESH_PATH = '/api/v1/balance/refresh'
 /** 配置读端点。界面只从这里取「凭据可不可写」这一件事。 */
 export const CONFIG_PATH = '/api/v1/config'
 
+/** 两条取数途径的状态端点。「连接」组的唯一事实出口。 */
+export const SOURCES_PATH = '/api/v1/sources'
+
+/** 测连接端点。**真打上游**，不是本地模拟。 */
+export const TEST_PATH = '/api/v1/test-connection'
+
 /** 可替换的 fetch，便于测试注入。 */
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -52,6 +58,59 @@ export interface RefreshResult {
   joined: boolean
   cooldownMs: number
   state: BalanceState
+}
+
+/** 一条取数途径的只读状态。与后端 `WireKeySource` 同形。 */
+export interface KeySourceInfo {
+  ref: string
+  configured: boolean
+  source: string | null
+  /** 首尾片段掩码，如 `sk-cf08d*****3b84`；未配置时是空串。 */
+  masked: string
+  /** 账本标识前 8 位；未配置时是空串。 */
+  tag8: string
+}
+
+/** 账号那条途径的只读状态。与后端 `WireAccountSource` 同形。 */
+export interface AccountSourceInfo {
+  available: boolean
+  signedIn: boolean
+  name: string | null
+  avatarUrl: string | null
+  contact: string | null
+}
+
+/** `GET /api/v1/sources` 的响应里本插件消费的那部分。 */
+export interface SourcesResponse {
+  /** 凭据世代；变了就说明有东西换了。`-1` 表示这份快照不可信。 */
+  revision: number
+  key: KeySourceInfo
+  account: AccountSourceInfo
+}
+
+/** 一次测连接的结果。 */
+export interface TestResult {
+  source: 'deepseek-http' | 'deepseek-account'
+  ok: boolean
+  latencyMs: number
+  code?: string
+  message?: string
+}
+
+/**
+ * 「读不到状态」时的保守快照。
+ *
+ * 两条途径都说「读不到」，世代 `-1` 让界面认得出这份不可信。
+ * **不抛错、不返回 null**：卡片读不到状态时该显示「未确认」，
+ * 而不是让整张卡片消失（与 `credential` 段同一策略）。
+ * @returns 保守快照。
+ */
+export function unknownSources(): SourcesResponse {
+  return {
+    revision: -1,
+    key: { ref: '', configured: false, source: null, masked: '', tag8: '' },
+    account: { available: false, signedIn: false, name: null, avatarUrl: null, contact: null },
+  }
 }
 
 /** 端点拿不到、或回的不是 JSON 时用的错误码。 */
@@ -208,4 +267,94 @@ export async function requestRefresh(
     }),
   })
   return await readJson<RefreshResult>(response, REFRESH_PATH)
+}
+
+/** 把一个值读成非空字符串，否则 `null`。 */
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' ? value : null
+}
+
+/**
+ * 只认形状对得上的 Key 状态。
+ *
+ * **宿主可能是旧版本**（客户端由 HMR 立刻换新，宿主模块要重启才换），那时响应里
+ * 根本没有这个字段。这里把它规整成保守值，而不是让 `undefined` 漏到组件里去 ——
+ * 这条纪律来自一次真实事故（见 docs/postmortem/2026-09-17-client-host-version-skew.md）。
+ * @param value - 响应里的原始值。
+ * @returns 规整后的状态。
+ */
+function readKeySource(value: unknown): KeySourceInfo {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return unknownSources().key
+  }
+  const record = value as Record<string, unknown>
+  return {
+    ref: typeof record.ref === 'string' ? record.ref : '',
+    configured: record.configured === true,
+    source: stringOrNull(record.source),
+    masked: typeof record.masked === 'string' ? record.masked : '',
+    tag8: typeof record.tag8 === 'string' ? record.tag8 : '',
+  }
+}
+
+/** 只认形状对得上的账号状态；形状不对时当「不可用」。 */
+function readAccountSource(value: unknown): AccountSourceInfo {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return unknownSources().account
+  }
+  const record = value as Record<string, unknown>
+  return {
+    available: record.available === true,
+    signedIn: record.signedIn === true,
+    name: stringOrNull(record.name),
+    avatarUrl: stringOrNull(record.avatarUrl),
+    contact: stringOrNull(record.contact),
+  }
+}
+
+/**
+ * 读一次两条途径的状态。
+ *
+ * `refresh` 为真时让后端强制重读（绕过它的缓存）—— 卡片打开、窗口重新获得焦点、
+ * 点「测试两条途径」时都用它。这正是修掉「在官方页换了 key，这里还显示旧的那把」的那一环。
+ * @param options - 是否强制重读，以及可注入的 fetch。
+ * @returns 两条途径的状态；形状不对时退化成保守快照。
+ * @throws 端点不可达、非 2xx 或响应不是 JSON。
+ */
+export async function requestSources(
+  options: { refresh?: boolean; fetchImpl?: FetchLike } = {},
+): Promise<SourcesResponse> {
+  const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const url = options.refresh === true ? `${SOURCES_PATH}?refresh=1` : SOURCES_PATH
+  const response = await fetchImpl(url, { headers: { accept: 'application/json' } })
+  const body = await readJson<Partial<SourcesResponse>>(response, SOURCES_PATH)
+  return {
+    revision: typeof body?.revision === 'number' ? body.revision : -1,
+    key: readKeySource(body?.key),
+    account: readAccountSource(body?.account),
+  }
+}
+
+/**
+ * 测一条途径的连接。**真打上游。**
+ *
+ * 这是对从前那个「本地字符串检查 + 800ms 假延迟」的替换：界面上那个按钮
+ * 现在读的是后端已经写好、也已经测过的真端点。
+ * @param source - 测哪条途径。
+ * @param options - 可注入的 fetch。
+ * @returns 结果；失败也是一份合法结果（`ok: false` + `code`）。
+ * @throws 端点不可达、非 2xx 或响应不是 JSON。
+ */
+export async function requestTest(
+  source: 'deepseek-http' | 'deepseek-account',
+  options: { fetchImpl?: FetchLike } = {},
+): Promise<TestResult> {
+  const fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init))
+  const response = await fetchImpl(TEST_PATH, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ source }),
+  })
+  const body = await readJson<TestResult>(response, TEST_PATH)
+  return { ...body, source }
 }

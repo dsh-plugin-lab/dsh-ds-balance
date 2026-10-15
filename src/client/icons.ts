@@ -1,0 +1,74 @@
+/**
+ * 本插件用到的**全部图标，一处定义**。
+ *
+ * 为什么要有一张表：图标从前散在四处（卡片 JSX、`fields.tsx` 的 `icon={null}`、
+ * 选择器的 chevron、浮层的两个按钮），同一个概念在不同文件里各写一份，
+ * 改一处必漏一处 —— 而且「哪个组用哪个图标」这件事本身没有地方可查。
+ *
+ * 取值规则（本仓规则层定的）：
+ * 1. **官方图标集里有语义对得上的就用官方的**（`@deepseek-ai/dsh-client-ui-primitives`
+ *    的 `Icon*OutlineRegular`）—— 本文件只做「选哪个」，不重新画；
+ * 2. 官方没有对应语义时**自绘**，且规格逐条照官方
+ *    （`viewBox="0 0 16 16"`、`strokeWidth={1}`、`stroke="currentColor"`、
+ *    `aria-hidden="true"`、`size` 默认 14），见 [./icons/CURRENCY_ARTWORK]。
+ * 3. 笔画粗细一律用 `Regular`（1px），与配置页其余图标同档；`Medium` 是给大字号场景的。
+ *
+ * **尺寸**：`DisclosureRow` 的 `.leading svg` 会用自己的 CSS 覆盖 svg 的 width/height
+ * （见官方 `DisclosureRow.module.css`），所以传不传 `size` 都不影响分组头；
+ * 传它是为了浮层这类直接渲染的地方。
+ * @module dsh-ds-balance/client/icons
+ */
+
+import type { ComponentType } from 'react'
+import {
+  IconChevronDownOutlineRegular,
+  IconLinkOutlineRegular,
+  IconPluginPinwheelOutlineRegular,
+  IconRefreshOutlineRegular,
+  IconWarningOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CurrencyOutlineIcon } from './icons/currency.tsx'
+
+/** 本插件用到的图标组件形状。 */
+export type AppIcon = ComponentType<IconProps>
+
+/**
+ * 四个配置分组的图标。
+ *
+ * **连接用链条**（`IconLinkOutlineRegular`）：这一组讲的是「接通官方」，
+ * 而它从前用的是 `IconApiOutlineRegular`（`</>`）—— 那个字形讲的是「写代码」，
+ * 语义对不上。
+ *
+ * **展示用自绘货币图标**：官方图标集里**没有**货币语义的字形
+ * （逐个核对过 `ui-primitives/src/icons/index.tsx` 的全部导出：无 Coin / Money /
+ * Currency / Wallet / Yuan / Dollar），而这一组讲的正是「显示币种」。
+ * 仪表盘（`IconGaugeOutlineRegular`）语义偏「量程」，不选。
+ */
+export const GROUP_ICONS = {
+  connection: IconLinkOutlineRegular,
+  display: CurrencyOutlineIcon,
+  thresholds: IconWarningOutlineRegular,
+  refresh: IconRefreshOutlineRegular,
+} as const satisfies Record<string, AppIcon>
+
+/** 分组键，与 `BalanceSettingsCard` 的分组顺序一致。 */
+export type GroupIconKey = keyof typeof GROUP_ICONS
+
+/**
+ * 选择器 pill 右端的 chevron。
+ *
+ * 与 `Menu` 原语配套：pill 是自绘的，所以箭头也得自己放。
+ */
+export const SELECTOR_ICON: AppIcon = IconChevronDownOutlineRegular
+
+/**
+ * 浮层里的图标。
+ *
+ * `plugins` 与宿主侧栏 Plugins 条目同字形（跨插件只走服务，但图标是平台模块，
+ * 可以照引）；`refresh` 与分组头的刷新同源。
+ */
+export const POPOVER_ICONS = {
+  plugins: IconPluginPinwheelOutlineRegular,
+  refresh: IconRefreshOutlineRegular,
+} as const satisfies Record<string, AppIcon>

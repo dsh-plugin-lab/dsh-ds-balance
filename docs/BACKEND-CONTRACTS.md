@@ -93,12 +93,16 @@ Layer 0: 领域模型
 
 理由：官方 `web-search-deepseek` 插件共用同一引用名，与 `llm-deepseek` 默认逐字相同；用户在模型页配一次，本插件自动继承。
 
-**解析链**（优先级从高到低）：
+**解析链**（优先级从高到低，**3.0 起只有两档**）：
 
-1. 配置 `apiKey`（用户显式覆盖）
-2. `ctx.credentials.resolve(apiKeyRef)`
-3. `process.env[apiKeyRef]`
-4. 全空 → `NO_KEY`
+1. `ctx.credentials.resolve(apiKeyRef)`
+2. `process.env[apiKeyRef]`
+3. 全空 → `NO_KEY`
+
+> **3.0 变更**：第一档「配置 `apiKey`（用户显式覆盖）」**已删**。它让手改 `settings.yaml`
+> 的人可以静默压过官方那份凭据，而界面读的 `describe()` **看不见**它 —— 于是「凭据来源」
+> 展示会说假话。删掉后这条链就是「跟随官方」的字面实现。
+> 理由与替代方案 → [决策记录](../.agents/notes/2026-10-15-drop-apikey-field.md)。
 
 注意事项：
 
@@ -108,13 +112,20 @@ Layer 0: 领域模型
 - **无 credentials seam 时捕获异常，回落 `NO_KEY`**，测试要覆盖这条。
 - **已实测（阶段 0）**：本机 `resolve('DEEPSEEK_API_KEY')` 命中，`source: 'env'`，`valueLength: 35`。
 - **已实测**：`describe('DEEPSEEK_API_KEY')` → `{ configured: true, source: 'env', writable: false }`。
-  **环境层只读**，所以卡片**不许**把 `apiKeyRef` 做成「覆盖宿主凭据」的入口。
+- `apiKeyRef` **3.0 起不上界面**（默认值即官方那一个），但**留在 schema 里** ——
+  它是「读凭据存储里的哪一条」这个真输入，而状态展示**跟着它读**，不构成假话。
 
 ### 3.2 端点独立
 
-自带 `baseUrl`，不继承 `llm-deepseek` 的端点。
+**端点是一个常量**（3.0 起删掉了 `baseUrl` 配置项），值为官方根地址
+`https://api.deepseek.com`；抓取与测连接都从 [src/config.ts](../src/config.ts) 的 `ENDPOINT` 取。
 
 理由：官方 `web-search-deepseek` 刻意不继承 —— 辅助端点独立于对话适配器选择的协议，对话适配器可能切协议，余额端点不应跟着变。
+
+> **不要改成跟随 `DEEPSEEK_BASE_URL`**：那个变量是 **Messages 根地址**
+> （`https://api.deepseek.com/anthropic`），而余额端点在根域下（`GET {root}/user/balance`）——
+> 照抄会拼出 `.../anthropic/user/balance`。这正是「端点独立」的由来。
+> 代价（已知并接受）：走内网镜像 / 自建代理的部署失去了唯一的变通办法。
 
 ### 3.3 数据通道选 `connection.fetch`
 
@@ -328,14 +339,13 @@ class KeyResolver {
 
 ### 6.2 ConfigService 与 schema
 
-**字段名与 [UI 侧契约与移交](UI-HANDOFF.md) 第六节逐字一致，共 11 个。**
+**字段名与 [UI 侧契约与移交](UI-HANDOFF.md) 第六节逐字一致，共 9 个。**
+（3.0 起删掉了 `apiKey` 与 `baseUrl`，见 §3.1 / §3.2。）
 
 ```ts
 const Config = z.object({
-  // 连接
-  apiKey: z.string().role('secret').default(''),
+  // 连接（只剩引用名；它不上界面，默认值即官方那一个）
   apiKeyRef: z.string().role('credential-ref').default('DEEPSEEK_API_KEY'),
-  baseUrl: z.string().default(''),          // 留空 = 官方默认地址；空串只在 endpointOf 翻译一次
 
   // 刷新
   serverRefreshSeconds: z.natural().min(10).max(3600).default(60),
@@ -544,9 +554,10 @@ JSON 解析失败时退回纯文本前 200 字符。
 |---|---|---|
 | GET | `/api/v1/balance` | 读余额视图 |
 | POST | `/api/v1/balance/refresh` | 强制刷新 |
-| GET | `/api/v1/config` | 读配置（掩码） |
+| GET | `/api/v1/config` | 读配置 |
 | PUT | `/api/v1/config` | 改配置 |
-| POST | `/api/v1/test-connection` | 测连接 |
+| GET | `/api/v1/sources` | 读两条取数途径的状态（「连接」组的唯一出口） |
+| POST | `/api/v1/test-connection` | 测连接（真打上游） |
 | GET | `/api/v1/healthz` | 健康 |
 
 **所有 `path` 写死精确值，不带尾随斜杠。**
@@ -596,20 +607,62 @@ JSON 解析失败时退回纯文本前 200 字符。
 
 ### 8.5 `GET /api/v1/config`
 
-返回掩码后的配置。**`apiKey` 永不返回，只返回 `apiKeyMasked`。**
+返回当前生效的配置（**9 个字段**，3.0 起删掉了 `apiKey` 与 `baseUrl`）。
 另回一段 `credential`（`{ ref, configured, source, writable }`），形状逐字对齐官方
-`credentialProvider.describe()`：**只有三个事实，没有装值的槽**。界面靠它决定凭据字段是
-「可编辑」还是「由启动环境提供」。凭据端口缺席或 `describe` 失败时回 `null`。
+`credentialProvider.describe()`：**只有三个事实，没有装值的槽**。凭据端口缺席或 `describe` 失败时回 `null`。
 
-### 8.6 `PUT /api/v1/config`
+> **3.0 变更**：从前这里还回一个 `apiKeyMasked`（固定长度星号串）。它已**移除** ——
+> 密钥的展示形态搬到 §8.6 的 `sources`，且从「固定星号」放宽成「首尾片段掩码」。
+> 完整密钥仍然**永不**跨线。
+
+### 8.6 `GET /api/v1/sources`
+
+**「连接」组的唯一事实出口**：两条取数途径（API Key / 账号登录）的只读状态一次给全。
+
+```jsonc
+{
+  "requestId": "req_…",
+  "schemaVersion": 1,
+  "revision": 3,                    // 凭据世代；凭据库或登录态一变就 +1
+  "key": {
+    "ref": "DEEPSEEK_API_KEY",
+    "configured": true,
+    "source": "file",               // describe() 的来源层；未知为 null
+    "masked": "sk-cf08d*****3b84",  // 首尾片段掩码；未配置为空串
+    "tag8": "3f9a2c71"              // 账本标识前 8 位；未配置为空串
+  },
+  "account": {
+    "available": true,              // 宿主有没有装账号接缝
+    "signedIn": false,
+    "name": null, "avatarUrl": null, "contact": null
+  }
+}
+```
+
+- `?refresh=1` 强制后端重读（绕过它的缓存）。卡片打开、窗口重新获得焦点、点测试按钮时用它。
+- **失败也回 `200` + 一份保守快照**（两条途径都说「读不到」，`revision: -1`）：
+  界面读不到状态时该显示「未确认」，而不是让整张卡片消失。
+- **`masked` 的边界**：只回**首尾片段**，中间固定 5 个星号（真实长度也是信息）。
+  形态与平台控制台 `platform.deepseek.com/api_keys` 一致。**完整密钥永不进响应体**。
+  见 §19 的红线。
+
+### 8.7 `PUT /api/v1/config`
 
 请求为任意字段子集；校验失败 `422`；成功后调用 §9.4 的钩子。
 
-### 8.7 `POST /api/v1/test-connection`
+### 8.8 `POST /api/v1/test-connection`
 
-请求 `{ baseUrl, apiKey?, timeoutMs? }`；**不动活动缓存**。成功返回延迟与余额预览，失败返回 `code` + `message`。
+请求 `{ source?, apiKey?, timeoutMs? }`；**不动活动缓存**。
 
-### 8.8 `GET /api/v1/healthz`
+- `source` 省略或 `deepseek-http`：走官方余额端点，成功返回延迟与余额预览。
+- `source: 'deepseek-account'`：走账号那条路**真读一次钱包**，成功只回 `{ ok, latencyMs }`。
+
+`baseUrl` 请求字段已随 `baseUrl` 配置一起删（3.0）：端点固定为官方根地址。
+
+> **界面只读成败与延迟，不读余额预览** —— 卡片不许出现任何额度信息（见
+> [src/client/settings/AGENTS.md](../src/client/settings/AGENTS.md)）。字段在响应里保留是契约完整性的要求。
+
+### 8.9 `GET /api/v1/healthz`
 
 返回 `situation` / `state` / **`source`（当前活跃来源）** / `lastSuccessAt` / `consecutiveFailures` / `scheduler.nextRunAt` / `store.ok` / `version`。
 两条路并存时，`source` 是唯一能一眼看出「现在服务的是哪条」的地方；指标键也带 `source` 标签。
@@ -785,12 +838,17 @@ import { resolveDshHome, dshHomePath, dshCachePath, dshHomeDisplay } from '@deep
 
 | 项 | 措施 |
 |---|---|
-| 密钥 | 只经 KeyResolver；不落日志；不返前端 |
+| 密钥 | 只经 KeyResolver；不落日志；**完整值永不进响应体** |
 | accountTag | HMAC-SHA256(serverSalt, apiKey) 前 32 hex |
 | serverSalt | 权限 `0o600`，路径由 `dshHomePath()` 拼 |
 | HTTP | 走 `connection.fetch`（自带鉴权与信任） |
-| 配置回传 | `apiKey` 只回掩码 |
+| 配置回传 | **密钥只以首尾片段掩码出现**（`sk-cf08d*****3b84`），且只在 `/api/v1/sources` |
 | 日志脱敏 | accountTag 只记前 8 位 |
+
+> **掩码那一条 3.0 放宽过**（从前是固定长度 `********`）：首尾片段换来的是**辨识度** ——
+> 用户要能看出「我现在用的是哪一把 key」，而固定星号回答不了这个问题。
+> 露出的 10 个字符不构成凭据；中间固定 5 个星号，真实长度不出线。
+> 先例：DeepSeek 平台控制台 `platform.deepseek.com/api_keys` 就是这么显示的。
 
 ---
 

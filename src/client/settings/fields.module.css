@@ -41,6 +41,69 @@
   padding-top: 10px;
 }
 
+/* ── 取数途径的状态行（只读展示，不是表单字段） ──────────────────── */
+
+/* 行结构：头部一行（状态点 / 头像 + 名称 + 右侧徽标），下面跟事实行与说明行。 */
+.source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+}
+
+.sourceHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 状态点：8×8 实心圆，逐值抄官方 ui-settings-models 的 .credentialDot。
+   **必须是真的圆**（它不是控件圆角），所以成对写 50% + corner-shape: round。 */
+.dot {
+  box-sizing: border-box;
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+.dotOk {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.dotMissing {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+.sourceName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 事实行（来源层 · 掩码 · 账本标识）：等宽字体，因为它主要是标识符。 */
+.sourceDetail {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+  word-break: break-all;
+}
+
+/* 测试结果行：与事实行同档字号，但用状态色，且不吃等宽字体（它是一句话）。 */
+.sourceResult {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-state-error-primary);
+}
+
 /* 上下结构字段：标签行、控件、说明行。 */
 .field {
   display: flex;

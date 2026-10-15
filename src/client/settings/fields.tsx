@@ -7,15 +7,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import {
-  Button,
-  DisclosureRow,
-  IconChevronDownOutlineRegular,
-  Input,
-  Menu,
-  Tag,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, DisclosureRow, Input, Menu, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import { SELECTOR_ICON } from '../icons.ts'
 import css from './fields.module.css'
 
 /** 一个配置分组的属性。展开状态由调用方持有：DisclosureRow 是完全受控组件。 */
@@ -190,72 +184,79 @@ export function TextControl(props: TextControlProps) {
   )
 }
 
-/**
- * 只读输入：字段照常渲染，但不可编辑，**框内不写任何文字**。
- *
- * 不从「隐藏字段」也不从「换一块只读文本」走：仍是真输入框，与官方凭据字段同一形态。
- * **只给 `readOnly`，不给 `disabled`** —— 官方「网页搜索」卡片里配好的密钥就是一个常态空框
- * （不降透明度），置灰只属于整份设置不可写的那种情况。
- * 只读的因由由标签行右侧的状态徽章与它下方的说明行承担，那两处的措辞来自词典。
- *
- * **为什么没有 placeholder**：灰字写在框里读起来像「这里该填但没填」。
- * **交互一律不响应**：它看着像输入框，但悬停不换描边、指针不是插入符、点了也没有焦点环
- * （`inputStatic` 那条规则，含 `pointer-events: none`）—— 看着像能编辑才是错的。
- */
-export interface ReadOnlyControlProps {
-  id: string
+/** 一条取数途径的状态：徽标、补充行与说明行。 */
+export interface SourceStatus {
+  /** 左侧状态点与徽标的档位：`ok` 绿、`missing` 红。 */
+  readonly tone: 'ok' | 'missing'
+  /** 右侧徽标文案（如「已配置密钥。」）。 */
+  readonly badge: string
+  /** 徽标下方那行事实：来源层 · 掩码 · 账本标识（可为空串）。 */
+  readonly detail: string
+  /** 一句说明这条途径是什么。 */
+  readonly hint: string
+}
+
+/** 一条取数途径的状态行。 */
+export interface SourceRowProps {
+  /** 途径名（「API Key」/「账号登录」）。 */
+  label: string
+  status: SourceStatus
+  /** 测试结果；未测过时为 null。 */
+  result: SourceResult | null
+  /** 行首的头像等元素；账号那行给头像，Key 那行不给。 */
+  leading?: ReactNode
 }
 
 /**
- * 渲染只读输入。
- * @param props - 控件 id。
- * @returns 输入框元素。
+ * 一次测试的结果。
+ *
+ * **成败是一个字段，不从文案里猜**：曾经用「文案是不是以 ✓ 开头」判成败，
+ * 而那个前缀没有任何地方在加 —— 于是失败样式恒定生效、成功也画成红的。
+ * 文案是给人看的，成败是给代码看的，两者不该共用一个字符串。
  */
-export function ReadOnlyControl(props: ReadOnlyControlProps) {
+export interface SourceResult {
+  readonly ok: boolean
+  readonly text: string
+}
+
+/**
+ * 渲染一条取数途径的状态行。
+ *
+ * **这是只读展示，不是表单字段**：它不接 `form`，也没有草稿与撤销。
+ * 结构照官方 Models 页的 provider 行 —— 左状态点 + 名称 + 右侧徽标，
+ * 下面跟一行事实与一句说明。状态点逐值抄官方 `.credentialDot`
+ * （8×8、`border-radius:50%`、`corner-shape:round`、成功绿 / 缺失红）。
+ * @param props - 名称、状态、测试结果与可选的行首元素。
+ * @returns 状态行元素。
+ */
+export function SourceRow(props: SourceRowProps) {
+  const dotClass = props.status.tone === 'ok' ? css.dotOk : css.dotMissing
   return (
-    <Input
-      id={props.id}
-      // inputStatic 落在官方 Input 的外壳 span 上：内框的静态化规则用后代选择器打进去。
-      className={css.inputStatic}
-      type="text"
-      value=""
-      readOnly
-    />
-  )
-}
-
-/** 二级折叠：卡片里的「自定义设置」。 */
-export interface DetailsGroupProps {
-  title: string
-  /** 初始展开状态；省略即收起。 */
-  defaultOpen?: boolean
-  children: ReactNode
-}
-
-/**
- * 渲染二级折叠「自定义设置」。
- *
- * **受控但跟手**：`open` 由 state 持有，官方 DisclosureRow 的展开体只在 open 时条件渲染，
- * 卡片每次重渲染（每敲一个字都会）不会把用户展开的块弹回去。
- * @param props - 标题、初始状态与内容。
- * @returns 折叠块元素。
- */
-export function DetailsGroup(props: DetailsGroupProps) {
-  const [open, setOpen] = useState(props.defaultOpen === true)
-  return (
-    <div className={css.details}>
-      <DisclosureRow
-        icon={null}
-        title={props.title}
-        open={open}
-        expandable
-        expandOnRowClick
-        onToggle={() => {
-          setOpen((value) => !value)
-        }}
-      >
-        <div className={css.detailsBody}>{props.children}</div>
-      </DisclosureRow>
+    <div className={css.source}>
+      <div className={css.sourceHead}>
+        {props.leading === undefined ? (
+          <span className={clsx(css.dot, dotClass)} aria-hidden="true" />
+        ) : (
+          props.leading
+        )}
+        <span className={css.sourceName}>{props.label}</span>
+        <span className={css.badges}>
+          <Tag tone={props.status.tone === 'ok' ? 'neutral' : 'quiet'}>{props.status.badge}</Tag>
+        </span>
+      </div>
+      {props.status.detail === '' ? null : (
+        <p className={css.sourceDetail}>{props.status.detail}</p>
+      )}
+      <p className={css.hint}>{props.status.hint}</p>
+      {props.result === null ? null : (
+        // 成功只是通报，用 polite 的 status；失败需要用户处理，按 06 §6.7 用 alert。
+        <p
+          className={props.result.ok ? css.resultOk : css.sourceResult}
+          role={props.result.ok ? 'status' : 'alert'}
+        >
+          {props.result.text}
+        </p>
+      )}
     </div>
   )
 }
@@ -318,7 +319,7 @@ export function SelectorControl(props: SelectorControlProps) {
           }}
         >
           {selected?.label ?? ''}
-          <IconChevronDownOutlineRegular className={css.selectorChevron} />
+          <SELECTOR_ICON className={css.selectorChevron} />
         </button>
       }
     />

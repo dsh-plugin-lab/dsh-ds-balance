@@ -12,7 +12,7 @@
 
 import type { AccountBalance, AccountWallet } from '../domain/account.js'
 import { UpstreamError, describeError } from '../domain/errors.js'
-import type { AccountSource } from '../ports/account.js'
+import type { AccountIdentity, AccountSource } from '../ports/account.js'
 import type { Logger } from '../ports/logger.js'
 
 /** 宿主单次余额查询的结果形状（对齐 `AccountDetails['balance']`）。 */
@@ -32,13 +32,35 @@ export interface HostAccountClient {
 }
 
 /**
+ * 宿主账号资料查询的结果形状（对齐 `AccountDetails['profile']`）。
+ *
+ * 只声明本插件真的会读的三个字段：名字、头像、脱敏联系方式。
+ * 宿主还会给 `id`，但账号 id 走 {@link HostAccountFace.getPlatformSession} 那条路
+ * （它不发起请求），所以这里不声明。
+ */
+export type HostAccountProfile =
+  | {
+      readonly status: 'ready'
+      readonly value: {
+        readonly name?: string | null
+        readonly avatarUrl?: string | null
+        readonly contact?: string | null
+      }
+    }
+  | { readonly status: 'failed' }
+
+/**
  * 宿主账号服务的最小面。
  *
- * 三个方法的语义逐字对齐宿主 `DeepSeekAccount` 的公开面；`null` 一律表示**此刻没有可用账号**
+ * 四个方法的语义逐字对齐宿主 `DeepSeekAccount` 的公开面；`null` 一律表示**此刻没有可用账号**
  * （未登录，或凭据在查询途中被换掉），不是「余额为零」。
+ *
+ * **`getProfile` 每次都会真打 Platform**（宿主实现里只有「上一次失败」才用同一 grant 的
+ * 缓存兜底），所以调用方必须缓存它的结果 —— 界面渲染一次问一次是不行的。
  */
 export interface HostAccountFace {
   getState(): Promise<{ readonly status?: string } | undefined>
+  getProfile(client: HostAccountClient): Promise<HostAccountProfile | null>
   getBalance(client: HostAccountClient): Promise<HostAccountBalance | null>
   getPlatformSession(): Promise<{ readonly userId?: string | null } | null>
 }
@@ -96,6 +118,19 @@ export function createAccountSource(options: HostAccountOptions): AccountSource 
           error: describeError(error),
         })
         return null
+      }
+    },
+
+    async profile(): Promise<AccountIdentity | null> {
+      const result = await service.getProfile(client())
+      // `null` = 未登录或查询途中换了凭据；`failed` = 上游读不到。
+      // 两者在界面上是**同一件事**（「资料暂不可用」），所以都不抛，只回 null。
+      if (result === null || result.status !== 'ready') return null
+      const { name, avatarUrl, contact } = result.value
+      return {
+        name: typeof name === 'string' && name !== '' ? name : null,
+        avatarUrl: typeof avatarUrl === 'string' && avatarUrl !== '' ? avatarUrl : null,
+        contact: typeof contact === 'string' && contact !== '' ? contact : null,
       }
     },
 

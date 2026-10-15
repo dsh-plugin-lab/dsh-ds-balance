@@ -137,9 +137,7 @@ UI 已经做完并用 mock 跑通；它只认一组固定字段与一条机械�
 
 | 字段 | 类型 | 默认 | 范围 |
 |---|---|---|---|
-| `apiKey` | string，`role('secret')` | `''` | — |
-| `apiKeyRef` | string，`role('credential-ref')` | `DEEPSEEK_API_KEY` | 必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$` |
-| `baseUrl` | string | `https://api.deepseek.com` | — |
+| `apiKeyRef` | string，`role('credential-ref')` | `DEEPSEEK_API_KEY` | 必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`；**不上界面** |
 | `serverRefreshSeconds` | 自然数 | 60 | 10–3600 |
 | `clientPollSeconds` | 自然数 | 30 | 5–600 |
 | `manualRefreshCooldownSeconds` | 自然数 | 30 | 0–600 |
@@ -148,6 +146,15 @@ UI 已经做完并用 mock 跑通；它只认一组固定字段与一条机械�
 | `cnyCritical` | 数 | 5 | ≥0 |
 | `usdWarn` | 数 | 2 | ≥0 |
 | `usdCritical` | 数 | 1 | ≥0 |
+
+**3.0 删掉了两个字段**：`apiKey`（`role('secret')`）与 `baseUrl`（string）。前者让手改
+`settings.yaml` 的人可以静默压过官方那份凭据、而界面看不见它；后者没有第二个合法取值
+（本插件绑定官方）。**手改过这两个字段的部署会静默失效** —— 前者掉到凭据服务/环境变量，
+后者回到官方地址。理由与替代方案 → [决策记录](../.agents/notes/2026-10-15-drop-apikey-field.md)。
+
+**连接组是只读状态展示**（3.0）：两条取数途径各一行，状态与掩码来自 `GET /api/v1/sources`
+（见 [BACKEND-CONTRACTS.md](BACKEND-CONTRACTS.md) §8.6）；界面上**没有**填密钥或改地址的入口。
+掩码是首尾片段（`sk-cf08d*****3b84`），完整密钥永不跨线。
 
 **四个阈值只存不判**：它们是给后端的输入，界面不据其做任何上色或判断（唯一例外是圆环弧长拿 `warn` 当刻度）。
 

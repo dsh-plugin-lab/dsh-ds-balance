@@ -11,9 +11,7 @@ import type { DeepSeekClient } from '../src/ports/deepseek-client.ts'
 const SALT = 'test-salt'
 
 const defaults: Config = {
-  apiKey: '',
   apiKeyRef: 'DEEPSEEK_API_KEY',
-  baseUrl: 'https://api.deepseek.com',
   serverRefreshSeconds: 60,
   clientPollSeconds: 30,
   manualRefreshCooldownSeconds: 30,
@@ -31,9 +29,10 @@ function keySide(key = 'sk-test') {
     source: { get: () => defaults, watch: () => () => {} },
     env: {},
   })
+  // 密钥从环境变量那一档进来（配置覆盖那档已随 `apiKey` 删除）。
   const keys = new KeyResolver({
-    readConfig: () => ({ apiKey: key, apiKeyRef: 'DEEPSEEK_API_KEY' }),
-    env: {},
+    readConfig: () => ({ apiKeyRef: 'DEEPSEEK_API_KEY' }),
+    env: key === '' ? {} : { DEEPSEEK_API_KEY: key },
   })
   const client: DeepSeekClient = {
     fetchBalance: vi.fn().mockResolvedValue(raw),
@@ -46,6 +45,7 @@ function accountSide(patch: Partial<AccountSource> = {}, present = true) {
   const account: AccountSource = {
     signedIn: async () => true,
     accountId: async () => 'user-1',
+    profile: async () => null,
     readBalance: async () => ({ wallets: [{ currency: 'CNY', balance: '1' }], bonusWallets: [] }),
     ...patch,
   }

@@ -6,7 +6,7 @@
  * @module dsh-ds-balance/services/source-readers
  */
 
-import { endpointOf } from '../config.js'
+import { ENDPOINT } from '../config.js'
 import { projectAccountBalance } from '../domain/account.js'
 import { NoKeyError } from '../domain/errors.js'
 import type { AccountSource } from '../ports/account.js'
@@ -40,9 +40,9 @@ export function keyReader(options: {
     },
     async read() {
       const apiKey = await keys.resolve()
-      const current = config.current()
       const raw = await client.fetchBalance({
-        baseUrl: endpointOf(current),
+        // 端点固定为官方根地址（3.0 起不再可配），见 config.ts 的 ENDPOINT。
+        baseUrl: ENDPOINT,
         apiKey,
         timeoutMs: config.timeoutMs(),
       })

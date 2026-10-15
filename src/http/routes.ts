@@ -19,6 +19,7 @@ import {
   handleConfigUpdate,
   handleHealthz,
   handleRefresh,
+  handleSources,
   handleTestConnection,
   type HttpDeps,
 } from './handlers.js'
@@ -48,6 +49,7 @@ export const HTTP_ROUTES = [
   { path: '/api/v1/balance', methods: ['GET'], handle: handleBalance },
   { path: '/api/v1/balance/refresh', methods: ['POST'], handle: handleRefresh },
   { path: '/api/v1/config', methods: ['GET', 'POST'], handle: handleConfigRoute },
+  { path: '/api/v1/sources', methods: ['GET'], handle: handleSources },
   { path: '/api/v1/test-connection', methods: ['POST'], handle: handleTestConnection },
   { path: '/api/v1/healthz', methods: ['GET'], handle: handleHealthz },
 ] as const satisfies readonly {

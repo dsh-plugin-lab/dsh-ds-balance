@@ -1,0 +1,27 @@
+/* 账号头像。取值逐条对齐官方 ui-settings-account 的 AccountAvatar.module.css
+   与 AccountSection.module.css 的 .avatar —— 红线会逐值比对注释点名的官方文件。 */
+
+/* 32×32 的圆底。**必须是真的圆**，所以成对写 50% + corner-shape: round
+   （控件圆角才继承宿主的 superellipse；圆点不继承）。 */
+.avatar {
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  corner-shape: round;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-skeleton);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  corner-shape: round;
+  object-fit: cover;
+}
