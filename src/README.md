@@ -12,7 +12,7 @@
 - `adapters/`：端口实现（Layer 2），见 [adapters/README.md](adapters/README.md)。
 - `services/`：应用服务（Layer 3），见 [services/README.md](services/README.md)。
 - `http/`：HTTP 端点（Layer 4），见 [http/README.md](http/README.md)。
-- `config.ts`：插件配置 schema、Loader 条目 id 与派生常量。**11 个字段全是 `.volatile()`**（否则表单里不出现、写也写不进去），`apply` 收到的是引用面 `ConfigRefs` 而不是值。
+- `config.ts`：插件配置 schema、Loader 条目 id 与派生常量。**9 个字段全是 `.volatile()`**（否则表单里不出现、写也写不进去），`apply` 收到的是引用面 `ConfigRefs` 而不是值。
 - `version.ts`：线上 schema 版本与插件版本（与 `package.json` 有测试兜底）。
 
 ## 关键导出

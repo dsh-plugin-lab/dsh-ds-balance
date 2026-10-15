@@ -43,6 +43,7 @@ import { BalanceService } from './services/balance-service.js'
 import { ConfigService, type ConfigSource } from './services/config-service.js'
 import { KeyResolver } from './services/key-resolver.js'
 import { Scheduler } from './services/scheduler.js'
+import { SourcesService } from './services/sources-service.js'
 import { createAccountSource, type HostAccountFace } from './adapters/host-account.js'
 import type { BalanceSource } from './domain/balance.js'
 import type { AccountSource } from './ports/account.js'
@@ -77,8 +78,11 @@ export const SALT_FILE_NAME = '.salt'
  * **阈值与展示币种不在里面**：它们不改变上游取数节奏，而 severity 是后端按缓存快照
  * 现算的。把它们也算进去，用户改一次阈值就会顺带打一次官方接口 ——
  * 界面只要重新读一次缓存就够了。
+ *
+ * **`apiKey` 已随字段一起删（3.0）**：它曾是「用户显式覆盖密钥」的逃生舱，
+ * 现在解析链只剩引用名与环境变量，所以改引用名才是需要重排的那件事。
  */
-const SCHEDULE_FIELDS = ['serverRefreshSeconds', 'baseUrl', 'apiKey', 'apiKeyRef'] as const
+const SCHEDULE_FIELDS = ['serverRefreshSeconds', 'apiKeyRef'] as const
 
 /** 系统时钟。 */
 const systemClock: Clock = {
@@ -308,7 +312,7 @@ function connectRoute(ctx: Context): {
  *
  * 异步是因为盐要从磁盘读；读失败会降级，不阻断挂载。
  *
- * `refs` 是**引用面**不是值：schema 里 11 个字段全是 `.volatile()` 的，Loader 把
+ * `refs` 是**引用面**不是值：schema 里 9 个字段全是 `.volatile()` 的，Loader 把
  * 值提交进这些引用而不重挂本插件，所以 `apply` 只跑一次，读值一律走
  * `createConfigSource` 的现读路径。
  * @param ctx - 宿主上下文。
@@ -322,10 +326,7 @@ export async function apply(ctx: Context, refs: ConfigRefs): Promise<void> {
   // 端口只建一次：KeyResolver 与 HTTP 端点读的是同一份「可不可写」的事实。
   const credentials = credentialsPort(ctx)
   const keys = new KeyResolver({
-    readConfig: () => {
-      const current = configService.current()
-      return { apiKey: current.apiKey, apiKeyRef: current.apiKeyRef }
-    },
+    readConfig: () => ({ apiKeyRef: configService.current().apiKeyRef }),
     credentials,
     logger,
   })
@@ -369,6 +370,14 @@ export async function apply(ctx: Context, refs: ConfigRefs): Promise<void> {
     logger,
     metrics,
   })
+  // 两条取数途径的状态：界面「连接」组的唯一事实出口。
+  const sources = new SourcesService({
+    keys,
+    credentials,
+    account: () => account.current(),
+    salt,
+    logger,
+  })
   const scheduler = new Scheduler({ target: service, logger })
   /**
    * 可选服务到位时把来源判据重定一次。
@@ -390,8 +399,24 @@ export async function apply(ctx: Context, refs: ConfigRefs): Promise<void> {
       if (
         paths.some((path) => path.length > 0 && SCHEDULE_FIELDS.some((field) => field === path[0]))
       ) {
+        // 引用名改了 = 换了另一份凭据：两条途径的状态要重读，缓存也失效。
+        sources.invalidate()
         scheduler.reset()
       }
+    })
+    /**
+     * 凭据库变了就作废状态缓存。
+     *
+     * **这是对 [2026-09-30 那条决策](../../.agents/notes/2026-09-30-credential-change-refresh-boundary.md)
+     * 的有意反转**，理由写在新记录里：那一轮「不订阅」是因为订阅只买到「把等一个周期压到秒级」，
+     * 而现在界面要**展示**凭据状态 —— 不订阅的话，在官方模型页换了 key 之后，
+     * 卡片会一直显示旧的那把（同一个引用名，值换了），那是**说假话**，不是「慢一点」。
+     *
+     * 只作废缓存，不重排调度：取数节奏仍由 `SCHEDULE_FIELDS` 与轮询决定，
+     * 免得同一引用名重写成同一个值也白抓一次上游。
+     */
+    const stopCredentialWatch = ctx.on('credentials/reference-updated', (ref) => {
+      if (ref === sources.keyRef()) sources.invalidate()
     })
     let stopped = false
     // 先恢复落盘快照再起调度，否则首拉之前的窗口里界面会闪一次空态。
@@ -401,6 +426,7 @@ export async function apply(ctx: Context, refs: ConfigRefs): Promise<void> {
     return () => {
       stopped = true
       stopWatching()
+      stopCredentialWatch()
       scheduler.stop()
       // 句柄由调用方关闭：facility 不绑消费方 fiber（契约 §10.0）。
       void store.close()
@@ -419,6 +445,8 @@ export async function apply(ctx: Context, refs: ConfigRefs): Promise<void> {
         logger,
         metrics,
         credentials,
+        sources,
+        account: () => account.current(),
       })
       return () => {
         void disposeRoutes()

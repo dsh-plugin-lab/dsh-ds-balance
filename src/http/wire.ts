@@ -59,12 +59,71 @@ export interface WireCredentialInfo {
   writable: boolean
 }
 
+/**
+ * 一条取数途径的只读状态。
+ *
+ * **这是「连接」组唯一的事实出口**：界面不再自己拼四档判据，也不再跨端点拼两半。
+ * 判据住在后端（它本来就持有 `credentials` 与 `deepseekAccount`），客户端只渲染。
+ *
+ * `masked` 是**首尾片段掩码**（`sk-cf08d*****3b84`），与平台控制台
+ * `platform.deepseek.com/api_keys` 同形 —— **完整密钥永不跨这条线**，
+ * 后端解析出明文后立刻算掩码并丢掉明文。见 [AGENTS.md](AGENTS.md) 的红线。
+ */
+export interface WireKeySource {
+  /** 生效的凭据引用名。 */
+  ref: string
+  /** 解析链此刻能不能拿到值（`credentials` 或环境变量任一有）。 */
+  configured: boolean
+  /** 生效值的来源层：`file` / `env` / `project-env` / `user-env`；未知为 `null`。 */
+  source: string | null
+  /** 首尾片段掩码；未配置或拿不到明文时是空串。 */
+  masked: string
+  /** 账本标识前 8 位（`HMAC(salt, key)`）；未配置时是空串。 */
+  tag8: string
+}
+
+/** 账号登录那条途径的只读状态。 */
+export interface WireAccountSource {
+  /** 宿主是否装了账号接缝。缺席时整条途径不存在，界面据此显示「不可用」而不是消失。 */
+  available: boolean
+  /** 本地存着登录凭据（存储态，不代表服务端验过）。 */
+  signedIn: boolean
+  /** 账号显示名；读不到时为 `null`。 */
+  name: string | null
+  /** 头像 URL；没有头像时为 `null`。 */
+  avatarUrl: string | null
+  /** 服务端已脱敏的联系方式；读不到时为 `null`。 */
+  contact: string | null
+}
+
+/**
+ * `GET /api/v1/sources` 的响应体。
+ *
+ * `revision` 是**凭据世代**：凭据库变了、或账号登录态变了，它就 +1。
+ * 界面拿它当「有没有东西换了」的判据 —— 不必把密钥本身放进 React 的依赖串。
+ */
+export interface WireSourcesResponse {
+  requestId: string
+  schemaVersion: number
+  revision: number
+  key: WireKeySource
+  account: WireAccountSource
+}
+
 /** `GET /api/v1/balance` 的响应体。 */
 export interface WireBalanceResponse {
   requestId: string
   schemaVersion: number
   /** 这一份数字是哪条取数路给的；界面据此在标题里标来源。 */
   source: BalanceSource
+  /**
+   * **这条路上用的凭据是哪一份**：掩码 key（首尾片段、不可逆）或账号名。
+   *
+   * 它跟着数字一起走，而不是让界面另外读一次 `/api/v1/sources` —— 两个缓存各自刷新时
+   * 标签会先跳、数字还停在旧的，那就是**标错来源**。读不到时 `null`，
+   * 界面退回「（API Key）」那种路名标签。
+   */
+  sourceIdentity: string | null
   /**
    * 处境：界面**唯一**的分支入口。
    *
@@ -116,12 +175,14 @@ function thresholdPair(pair: ThresholdPair): WireThresholdPair {
  * - 没有快照时 `isAvailable` 记 `false`。
  * @param view - 服务层给出的视图。
  * @param accountTag8 - 当前账本标识前 8 位；没有快照时传空串。
+ * @param sourceIdentity - 这条路上那份凭据的身份（掩码 key / 账号名）；读不到传 null。
  * @param requestId - 本次请求的标识。
  * @returns 契约 §8.3 的响应体。
  */
 export function toWireBalanceView(
   view: BalanceView,
   accountTag8: string,
+  sourceIdentity: string | null,
   requestId: string,
 ): WireBalanceResponse {
   const thresholds: Record<Currency, WireThresholdPair> = {}
@@ -132,6 +193,7 @@ export function toWireBalanceView(
     requestId,
     schemaVersion: SCHEMA_VERSION,
     source: view.source,
+    sourceIdentity,
     situation: view.situation,
     state: view.state,
     stale: view.stale,

@@ -40,6 +40,7 @@ describe('路由表', () => {
       '/api/v1/balance/refresh',
       '/api/v1/config',
       '/api/v1/healthz',
+      '/api/v1/sources',
       '/api/v1/test-connection',
     ])
     expect(new Set(paths).size).toBe(paths.length)

@@ -4,9 +4,7 @@ import { DEFAULT_TIMEOUT_MS, TIMEOUT_ENV, type Config } from '../src/config.ts'
 
 function makeConfig(patch: Partial<Config> = {}): Config {
   return {
-    apiKey: '',
     apiKeyRef: 'DEEPSEEK_API_KEY',
-    baseUrl: 'https://api.deepseek.com',
     serverRefreshSeconds: 60,
     clientPollSeconds: 30,
     manualRefreshCooldownSeconds: 30,

@@ -1,39 +1,55 @@
 /**
  * 「DeepSeek 余额」在 bundle 详情页里的配置卡片：标题与描述由页面画，卡内只有控件与保存。
- * 只做配置：连接、展示、阈值、刷新四组；不展示任何额度信息，也不按阈值给任何东西上色。
+ * 只做配置与**来源状态**：不展示任何额度信息，也不按阈值给任何东西上色。
  * 分组按使用频率排序：刷新三项有合理默认值，放最后。
+ *
+ * **「连接」组在 3.0 重做成只读状态展示**：从前它是一列输入框（一个继承官方的只读
+ * 凭据框 + 可编辑的接口地址 + 二级「自定义设置」里的引用名），但那些输入要么是假的
+ * （接口地址只服务官方、密钥框根本不能填），要么没有使用场景。现在它只回答一件事：
+ * **两条取数途径各自通不通**，以及一个真打上游的测试按钮。
+ *
+ * 判据住在后端（`GET /api/v1/sources`），本文件只渲染 —— 见 [use-sources.ts](use-sources.ts)。
  * @module dsh-ds-balance/client/settings/BalanceSettingsCard
  */
 
-import { useState, type ReactNode } from 'react'
-import {
-  Button,
-  IconApiOutlineRegular,
-  IconGlobeOutlineRegular,
-  IconRefreshOutlineRegular,
-  IconWarningOutlineRegular,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { interpolate } from '../locales.ts'
 import type { LocaleKey } from '../locales.ts'
+import { GROUP_ICONS } from '../icons.ts'
+import { AccountAvatar } from './AccountAvatar.tsx'
 import {
   ActionRow,
-  DetailsGroup,
-  FieldBadges,
   FieldFrame,
   FieldGroup,
-  ReadOnlyControl,
   SelectorControl,
+  SourceRow,
   TextControl,
 } from './fields.tsx'
-import type { FieldStatus, SelectorOption } from './fields.tsx'
+import type { SelectorOption, SourceLive } from './fields.tsx'
 import { AUTO_CURRENCY, currencyCodes, THRESHOLD_PAIRS, useConfigForm } from './use-config-form.ts'
 import type { ConfigFormOf } from './use-config-form.ts'
-import { credentialViewOf, useCredentialState } from './use-credential-state.ts'
-import type { CredentialView } from './use-credential-state.ts'
+import { useSources } from './use-sources.ts'
+import { accountStatusOf, keyStatusOf } from './source-status.ts'
+import { requestTest } from '../data.ts'
 import css from './BalanceSettingsCard.module.css'
 import fieldCss from './fields.module.css'
 
 export type { ConfigFormOf } from './use-config-form.ts'
+
+/**
+ * 测试结果的**停留时长**。
+ *
+ * 它排在凭据身份**左边**、几秒后自己消失 —— 身份不被顶掉（替换那一格会让它闪一下），
+ * 也不像从前那样在屏幕上留一行永久的、还把行高顶起来的结果
+ * （维护者 2026-10-15 明确要求，2026-10-15 二次修订为「排在身份左边」）。
+ */
+const RESULT_TTL_MS = 4000
+
+/** 一次测试的结果：哪一行、成败与那句话。 */
+interface TestOutcome {
+  readonly ok: boolean
+  readonly text: string
+}
 
 /** 卡片要求的属性。t 由框架按注册时声明的字典命名空间注入。 */
 export interface BalanceSettingsCardProps {
@@ -43,31 +59,18 @@ export interface BalanceSettingsCardProps {
   form: ConfigFormOf
 }
 
-/** 与宿主 schema 的默认值逐字一致的凭据引用名；快照缺字段时兜底。 */
-const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
-
-/**
- * 只读凭据行的状态徽章。
- * 四档的判据在 `use-credential-state.ts` 的 `credentialViewOf`：它答的是「当前生效的值从哪来」。
- */
-const CREDENTIAL_BADGE: Readonly<Record<CredentialView, LocaleKey>> = {
-  // 官方那张卡右上角只有一句话：「已配置密钥。」——继承来的、自己填的、环境提供的都算配置好了。
-  // 四档判据留着，是因为「覆盖 / 未覆盖」决定二级折叠里那两个字段的状态；徽章本身不区分它们。
-  env: 'settings.credential.configured',
-  configured: 'settings.credential.configured',
-  notConfigured: 'settings.credential.notConfigured',
-  overridden: 'settings.credential.configured',
-}
-
 /** 四个配置分组的键。 */
 type GroupKey = 'connection' | 'display' | 'thresholds' | 'refresh'
 
 /**
- * 分组的默认展开状态：四组默认**收起** —— 进页面先看到四行提纲，展开与否由用户点。
- * 组内有非法草稿时仍由 `groupOpenNow` 强制展开，不受这里影响。
+ * 分组的默认展开状态。
+ *
+ * **连接组默认展开**：它是这张卡片的第一件事 —— 用户点进来看的就是「现在通不通」，
+ * 而它只有两行状态加一个按钮，收起来只会让人多点一次。
+ * 其余三组默认收起（进页面先看到提纲，需要哪组点开哪组）。
  */
 const DEFAULT_GROUP_OPEN: Readonly<Record<GroupKey, boolean>> = {
-  connection: false,
+  connection: true,
   display: false,
   thresholds: false,
   refresh: false,
@@ -75,7 +78,7 @@ const DEFAULT_GROUP_OPEN: Readonly<Record<GroupKey, boolean>> = {
 
 /** 每组包含哪些字段；用来判断「这一组里有没有需要用户看见的非法草稿」。 */
 const GROUP_FIELDS = {
-  connection: ['apiKey', 'apiKeyRef', 'baseUrl'],
+  connection: [],
   display: ['displayCurrency'],
   thresholds: ['cnyWarn', 'cnyCritical', 'usdWarn', 'usdCritical'],
   refresh: ['serverRefreshSeconds', 'clientPollSeconds', 'manualRefreshCooldownSeconds'],
@@ -83,10 +86,6 @@ const GROUP_FIELDS = {
 
 /** 字段名到控件 id 的映射。 */
 const FIELD_IDS: Record<string, string> = {
-  apiKey: 'ds-balance-api-key',
-  apiKeyRef: 'ds-balance-api-key-ref',
-  apiKeyState: 'ds-balance-api-key-state',
-  baseUrl: 'ds-balance-base-url',
   serverRefreshSeconds: 'ds-balance-server-refresh-seconds',
   clientPollSeconds: 'ds-balance-client-poll-seconds',
   manualRefreshCooldownSeconds: 'ds-balance-manual-refresh-cooldown-seconds',
@@ -98,16 +97,6 @@ const FIELD_IDS: Record<string, string> = {
 }
 
 /**
- * 判断一个生效值算不算「有内容」。
- * @param value - 快照里的生效值。
- * @returns 非空串或任何非空值都为真。
- */
-function isFilled(value: unknown): boolean {
-  if (value === undefined || value === null) return false
-  return typeof value !== 'string' || value.trim() !== ''
-}
-
-/**
  * 渲染配置卡片。
  * @param props - 词典读取器与配置表单。
  * @returns 卡片元素；宿主没在服务这个命名空间时**什么都不渲染**。
@@ -116,6 +105,25 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
   const form = useConfigForm(scopedForm)
   const [groupOpen, setGroupOpen] =
     useState<Readonly<Record<GroupKey, boolean>>>(DEFAULT_GROUP_OPEN)
+
+  const { available, writable, dirty, invalid, saving, failed } = form.state
+  const disabled = !writable || saving
+
+  // 状态与测试结果。`enabled` 传 available：宿主没服务这个命名空间时不发请求。
+  const { sources, loading, refresh } = useSources(available)
+  const [testing, setTesting] = useState(false)
+  // 刚落定的测试结果，按途径存；几秒后自己清掉（见 RESULT_TTL_MS）。
+  const [outcomes, setOutcomes] = useState<ReadonlyMap<string, TestOutcome> | null>(null)
+  const outcomeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 卸载时收掉那个计时器：它跨越了组件生命周期（结果比一次渲染活得久）。
+  useEffect(
+    () => () => {
+      if (outcomeTimer.current !== null) clearTimeout(outcomeTimer.current)
+      outcomeTimer.current = null
+    },
+    [],
+  )
 
   // 各组独立展开，不做手风琴：多项同时展开是刻意的（官方 PluginCard.tsx:8-9 的注释）。
   const toggleGroup = (key: GroupKey): void => {
@@ -129,51 +137,6 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
     GROUP_FIELDS[key].some((name) => form.field(name).invalid) ||
     // 成对校验不是字段级 invalid，得单独问一次：否则收起的阈值组会挡住「保存为什么是灰的」。
     (key === 'thresholds' && THRESHOLD_PAIRS.some((pair) => !form.thresholdPairOk(pair.currency)))
-
-  const { available, writable, dirty, invalid, saving, failed } = form.state
-  const disabled = !writable || saving
-
-  // 凭据字段的状态胶囊：只描述已经存下来的事实，不看编辑中的草稿。
-  // 官方 SecretField 与知乎卡片同构：标签行右侧一个 Tag，neutral 表示有值，quiet 表示没有。
-  const credentialStatus = (name: string): FieldStatus => {
-    const state = form.field(name)
-    if (state.stored) return { label: t('settings.overridden'), tone: 'neutral' }
-    if (isFilled(state.effective)) return { label: t('settings.configured'), tone: 'neutral' }
-    return { label: t('settings.notConfigured'), tone: 'quiet' }
-  }
-
-  // 文本类字段：草稿或已存的用户覆盖都能撤销。
-  const textRow = (name: string, labelKey: LocaleKey, hintKey: LocaleKey, withStatus: boolean) => {
-    const state = form.field(name)
-    return (
-      <FieldFrame
-        id={FIELD_IDS[name] ?? name}
-        label={t(labelKey)}
-        status={withStatus ? credentialStatus(name) : null}
-        pending={state.dirty}
-        resettable={state.overridden || state.dirty}
-        pendingLabel={t('settings.unsaved')}
-        resetLabel={t('settings.reset')}
-        invalid={state.invalid}
-        hint={t(hintKey)}
-        disabled={disabled}
-        onReset={() => {
-          form.resetField(name)
-        }}
-      >
-        <TextControl
-          id={FIELD_IDS[name] ?? name}
-          text={state.text}
-          numeric={false}
-          invalid={state.invalid}
-          disabled={disabled}
-          onEdit={(text) => {
-            form.edit(name, text)
-          }}
-        />
-      </FieldFrame>
-    )
-  }
 
   // 数字字段：只有 inputMode 提示数字键盘，接受范围由宿主 schema 决定。
   // 给了 hintKey 的字段常态出说明，非法时换成 settings.invalidNumber —— 两句不同的话，
@@ -233,18 +196,6 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
     )
   }
 
-  const apiKey = form.field('apiKey')
-  const apiKeyRef = form.field('apiKeyRef')
-  // 读凭据状态用的是**生效**引用名：草稿还没保存时，后端认的仍是存下来的那个。
-  const effectiveRef =
-    typeof apiKeyRef.effective === 'string' && apiKeyRef.effective !== ''
-      ? apiKeyRef.effective
-      : DEFAULT_API_KEY_REF
-  const credential = useCredentialState(effectiveRef)
-  // 只读凭据行显示哪一档：覆盖优先（折叠里存过值就是它生效），其次才看宿主能不能写。
-  // 「读不到就说什么」的策略也在这个函数里，见它的文档注释。
-  const credentialView = credentialViewOf(credential, apiKey.stored || apiKeyRef.stored)
-
   const currency = form.field('displayCurrency')
   const currencyId =
     typeof currency.value === 'string' && currency.value !== '' ? currency.value : AUTO_CURRENCY
@@ -253,22 +204,11 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
     ...currencyCodes(currency.value, currency.effective).map((code) => ({ id: code, label: code })),
   ]
   // 「显示币种」是整行选择型：左文字、右 pill，结构照官方 General 行。
-  // 凭据字段才带状态徽标；这一行的左槽只放「未保存」与「重置」，右侧整块让给 pill。
   const currencyRow = (
     <div className={fieldCss.row}>
       <div className={fieldCss.rowText}>
         <div className={fieldCss.rowTitleLine}>
           <span className={fieldCss.rowTitle}>{t('settings.field.displayCurrency')}</span>
-          <FieldBadges
-            pending={currency.dirty}
-            resettable={currency.dirty}
-            pendingLabel={t('settings.unsaved')}
-            resetLabel={t('settings.reset')}
-            disabled={disabled}
-            onReset={() => {
-              form.resetField('displayCurrency')
-            }}
-          />
         </div>
         <p className={fieldCss.hint}>{t('settings.hint.displayCurrency')}</p>
       </div>
@@ -285,12 +225,88 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
     </div>
   )
 
-  const testResult =
-    form.test.ok === null
-      ? null
-      : form.test.ok
-        ? { ok: true, text: t('settings.test.ok') }
-        : { ok: false, text: interpolate(t('settings.test.fail'), { message: form.test.message }) }
+  /**
+   * 测试两条途径（按钮文案是 **Test** / 「测试」）。
+   *
+   * **真打上游**（`POST /api/v1/test-connection`），不是本地字符串检查 ——
+   * 这里替换掉的正是从前那个「检查字符串 + 等 800ms + 说连接正常」的假按钮。
+   *
+   * 每行右槽先转圈、再把成败与延迟排在**凭据身份左边**，几秒后自己消失；
+   * 顺带重读一次状态（测试往往紧跟着「刚改完凭据」）。**结果绝不单开一行**：
+   * 那会把行高顶起来。
+   */
+  const runTest = (): void => {
+    if (testing) return
+    setTesting(true)
+    setOutcomes(null)
+    if (outcomeTimer.current !== null) clearTimeout(outcomeTimer.current)
+    void (async () => {
+      const [keyResult, accountResult] = await Promise.all([
+        runOne('deepseek-http'),
+        runOne('deepseek-account'),
+      ])
+      setOutcomes(
+        new Map([
+          ['key', keyResult],
+          ['account', accountResult],
+        ]),
+      )
+      setTesting(false)
+      // 成败都只停 RESULT_TTL_MS：失败也不留下（维护者：不要一个东西一直在那）。
+      // 于是「刚测过」这件事只活在这几秒里 —— 常态下右侧恒是凭据身份。
+      outcomeTimer.current = setTimeout(() => {
+        outcomeTimer.current = null
+        setOutcomes(null)
+      }, RESULT_TTL_MS)
+      await refresh()
+    })()
+  }
+
+  /** 测一条途径并折成一句结果文案。 */
+  const runOne = async (source: 'deepseek-http' | 'deepseek-account'): Promise<TestOutcome> => {
+    try {
+      const result = await requestTest(source)
+      if (result.ok) {
+        return {
+          ok: true,
+          text: t('settings.test.ok').replace('{ms}', () => String(result.latencyMs)),
+        }
+      }
+      // 两个错误码有专门的话（它们不是「失败」，是「还没配」）。
+      if (result.code === 'NO_KEY') {
+        return {
+          ok: false,
+          text:
+            source === 'deepseek-account'
+              ? t('settings.test.notSignedIn')
+              : t('settings.test.noKey'),
+        }
+      }
+      return {
+        ok: false,
+        text: interpolate(t('settings.test.fail'), {
+          message: result.message ?? result.code ?? '',
+        }),
+      }
+    } catch {
+      return { ok: false, text: interpolate(t('settings.test.fail'), { message: 'unreachable' }) }
+    }
+  }
+
+  /**
+   * 组装一行右槽的临时内容。
+   *
+   * 优先级：正在测 > 刚测完 > 常态。前三者**共用同一个槽**，所以行高不随它们变化 ——
+   * 这正是本轮把「结果行」拆掉换来的东西。
+   * @param row - 途径键（`key` / `account`）。
+   * @returns 交给 SourceRow 的 live；没有临时内容时 null。
+   */
+  const liveOf = (row: string): SourceLive | null => {
+    if (testing) return { kind: 'busy' }
+    const outcome = outcomes?.get(row)
+    if (outcome === undefined) return null
+    return { kind: 'result', ok: outcome.ok, text: outcome.text }
+  }
 
   const footerNote = failed
     ? { text: t('settings.failed'), className: css.failed }
@@ -303,6 +319,9 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
   // 放在所有 hook 之后 —— 提前 return 会换掉 hook 顺序。
   if (!available) return null
 
+  const keyStatus = keyStatusOf(sources.key, t)
+  const accountStatus = accountStatusOf(sources.account, t)
+
   return (
     // 页面把这一格渲染在自己的 <section> 里：无外框的一列控件，所以根节点是 div、不是 li。
     <div className={css.form}>
@@ -312,59 +331,46 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
         </p>
       )}
 
+      {/* ── 连接：两条取数途径的只读状态 + 一个真测试按钮 ───────────── */}
       <FieldGroup
-        icon={<IconApiOutlineRegular size={14} />}
+        icon={<GROUP_ICONS.connection size={14} />}
         title={t('settings.group.connection')}
+        // 组级一句替代原来每行各一句的近义说明（那两句本身也是重复）。
+        note={t('settings.sources.groupNote')}
         open={groupOpenNow('connection')}
         onToggle={() => {
           toggleGroup('connection')
         }}
       >
-        {/* 凭据状态：只读展示。结构照搬官方「模型」卡片对「启动环境提供的密钥」的处理 ——
-            字段照常渲染，disabled、整块降到 60%，而不是隐藏或另做只读块。
-            **框内不写字**：状态改由标签行右侧的徽章（四档）与它下方的说明行承担；
-            灰字占位符读起来像「这里该填但没填」，语气是错的。
-            要覆盖它，展开下方的「自定义设置」。 */}
-        <FieldFrame
-          id={FIELD_IDS.apiKeyState ?? 'apiKeyState'}
-          label={t('settings.field.apiKey')}
-          status={{
-            label: t(CREDENTIAL_BADGE[credentialView]),
-            tone: credentialView === 'notConfigured' ? 'quiet' : 'neutral',
-          }}
-          pending={false}
-          resettable={false}
-          pendingLabel={t('settings.unsaved')}
-          resetLabel={t('settings.reset')}
-          invalid={false}
-          hint={t('settings.hint.credential')}
-          disabled
-          onReset={() => {}}
-        >
-          <ReadOnlyControl id={FIELD_IDS.apiKeyState ?? 'apiKeyState'} />
-        </FieldFrame>
-
-        {textRow('baseUrl', 'settings.field.baseUrl', 'settings.hint.baseUrl', false)}
-
-        <div className={fieldCss.field} key="test">
-          <ActionRow
-            label={form.test.running ? t('settings.testing') : t('settings.test')}
-            disabled={disabled || form.test.running}
-            result={testResult}
-            onClick={form.runTest}
+        <div className={fieldCss.fields}>
+          <SourceRow
+            label={t('settings.sources.key')}
+            status={keyStatus}
+            live={liveOf('key')}
+            monoIdentity
           />
+          <SourceRow
+            label={t('settings.sources.account')}
+            status={accountStatus}
+            live={liveOf('account')}
+            // 账号那行**已登录就给头像**（有头像就是身份本身，比灯更有信息）；
+            // 没登录则连头像都不给，落回与 Key 那行同形的红灯。
+            {...(sources.account.signedIn
+              ? { leading: <AccountAvatar url={sources.account.avatarUrl} /> }
+              : {})}
+          />
+          <div className={fieldCss.field}>
+            <ActionRow
+              label={testing ? t('settings.testing') : t('settings.test')}
+              disabled={disabled || testing || loading}
+              onClick={runTest}
+            />
+          </div>
         </div>
-
-        {/* 二级折叠，默认收起：**只能改凭据引用名，不能再填一个 Key** ——
-            界面上唯一的 API Key 就是上面那个继承官方、不可改的框（官方「网页搜索」卡片同款）。
-            Key 本身仍可由配置文件提供，所以 schema 与写入面都不动。 */}
-        <DetailsGroup title={t('settings.group.customized')}>
-          {textRow('apiKeyRef', 'settings.field.apiKeyRef', 'settings.hint.apiKeyRef', true)}
-        </DetailsGroup>
       </FieldGroup>
 
       <FieldGroup
-        icon={<IconGlobeOutlineRegular size={14} />}
+        icon={<GROUP_ICONS.display size={14} />}
         title={t('settings.group.display')}
         open={groupOpenNow('display')}
         onToggle={() => {
@@ -375,7 +381,7 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
       </FieldGroup>
 
       <FieldGroup
-        icon={<IconWarningOutlineRegular size={14} />}
+        icon={<GROUP_ICONS.thresholds size={14} />}
         title={t('settings.group.thresholds')}
         note={t('settings.hint.threshold')}
         open={groupOpenNow('thresholds')}
@@ -391,7 +397,7 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
 
       {/* 刷新三项都有合理默认值，属于装了就不用动的那一档，因此排在最后。 */}
       <FieldGroup
-        icon={<IconRefreshOutlineRegular size={14} />}
+        icon={<GROUP_ICONS.refresh size={14} />}
         title={t('settings.group.refresh')}
         note={t('settings.hint.refreshAdvanced')}
         open={groupOpenNow('refresh')}
@@ -423,16 +429,16 @@ export function BalanceSettingsCard({ t, form: scopedForm }: BalanceSettingsCard
             {footerNote.text}
           </p>
         )}
-        <Button
+        <button
           type="button"
-          variant="primary"
+          className={css.save}
           disabled={!dirty || invalid || saving || !writable}
           onClick={() => {
             void form.save()
           }}
         >
           {saving ? t('settings.saving') : t('settings.save')}
-        </Button>
+        </button>
       </div>
     </div>
   )

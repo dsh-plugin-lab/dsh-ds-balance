@@ -7,20 +7,14 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import {
-  Button,
-  DisclosureRow,
-  IconChevronDownOutlineRegular,
-  Input,
-  Menu,
-  Tag,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Menu, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
+import { HEADER_CHEVRONS, RESULT_ICONS, SELECTOR_ICON } from '../icons.ts'
 import css from './fields.module.css'
 
-/** 一个配置分组的属性。展开状态由调用方持有：DisclosureRow 是完全受控组件。 */
+/** 一个配置分组的属性。展开状态由调用方持有。 */
 export interface FieldGroupProps {
-  /** 折叠头左侧的图标；展开后会被原语自己的 chevron 取代。 */
+  /** 折叠头左侧的图标。**常态一直显示**，只在悬浮（或键盘聚焦）时让位给箭头。 */
   icon: ReactNode
   /** 折叠头标题，收起态也显示。 */
   title: string
@@ -35,25 +29,55 @@ export interface FieldGroupProps {
 
 /**
  * 一个可折叠的配置分组。
- * 折叠头用原语 DisclosureRow（不自己画），展开体由原语在 open 时条件渲染、无动画。
- * 各组独立展开，不做手风琴：官方 PluginCard 的注释写明多项同时展开是刻意的。
+ *
+ * **折叠头是自绘的，不是原语 `DisclosureRow`** —— 这一条与本仓规则层原先的写法相反，
+ * 所以理由写在这里：原语在**展开**时无条件把图标换成上箭头（`DisclosureRow.tsx` 里是
+ * `const leading = open ? <IconChevronUpOutlineRegular/> : collapsedLeading`），
+ * 而它那个 `previewChevron` 只作用于**收起**那一支。于是「常态显示组图标、悬浮才换箭头」
+ * 在展开态**无法表达**，而组图标正是「这是哪一组」唯一的视觉线索（收起态有、展开态没有，
+ * 反而是最需要它的时候丢了）。
+ *
+ * 取值逐条照抄官方那份 CSS（24px 行高、16px 图标框、6px 间距、13px 标题、
+ * tertiary → secondary、100ms 过渡，见 [fields.module.css](fields.module.css) 的注释），
+ * 并由 [test/redlines.test.ts](../../../test/redlines.test.ts) 与官方文件**逐值比对**防漂。
+ * 无障碍面照原语保留：`role="button"` + `tabIndex` + `aria-expanded` + Enter/Space。
  * @param props - 图标、标题、可选说明、受控展开状态与字段。
  * @returns 分组元素。
  */
 export function FieldGroup(props: FieldGroupProps) {
   return (
-    <DisclosureRow
+    <div
       className={clsx(css.group, props.last === true && css.groupLast)}
-      icon={props.icon}
-      title={props.title}
-      open={props.open}
-      expandable
-      expandOnRowClick
-      onToggle={props.onToggle}
+      data-open={props.open || undefined}
     >
-      {props.note === undefined ? null : <p className={css.groupNote}>{props.note}</p>}
-      <div className={css.fields}>{props.children}</div>
-    </DisclosureRow>
+      <div
+        className={css.groupHead}
+        data-disclosure-row
+        role="button"
+        tabIndex={0}
+        aria-expanded={props.open}
+        onClick={props.onToggle}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          props.onToggle()
+        }}
+      >
+        <span className={css.groupLeading}>
+          <span className={css.groupIcon}>{props.icon}</span>
+          {/* 两个箭头都在 DOM 里，靠 CSS 的透明度换 —— 这样悬浮态不会换元素、不会抖。 */}
+          <HEADER_CHEVRONS.closed className={css.groupChevronClosed} />
+          <HEADER_CHEVRONS.open className={css.groupChevronOpen} />
+        </span>
+        <span className={css.groupTitle}>{props.title}</span>
+      </div>
+      {props.open ? (
+        <>
+          {props.note === undefined ? null : <p className={css.groupNote}>{props.note}</p>}
+          <div className={css.fields}>{props.children}</div>
+        </>
+      ) : null}
+    </div>
   )
 }
 
@@ -191,71 +215,113 @@ export function TextControl(props: TextControlProps) {
 }
 
 /**
- * 只读输入：字段照常渲染，但不可编辑，**框内不写任何文字**。
+ * 一条取数途径的状态。
  *
- * 不从「隐藏字段」也不从「换一块只读文本」走：仍是真输入框，与官方凭据字段同一形态。
- * **只给 `readOnly`，不给 `disabled`** —— 官方「网页搜索」卡片里配好的密钥就是一个常态空框
- * （不降透明度），置灰只属于整份设置不可写的那种情况。
- * 只读的因由由标签行右侧的状态徽章与它下方的说明行承担，那两处的措辞来自词典。
- *
- * **为什么没有 placeholder**：灰字写在框里读起来像「这里该填但没填」。
- * **交互一律不响应**：它看着像输入框，但悬停不换描边、指针不是插入符、点了也没有焦点环
- * （`inputStatic` 那条规则，含 `pointer-events: none`）—— 看着像能编辑才是错的。
+ * **只有三样东西**，因为它们各自回答一个不同的问题，彼此不重复（这是本轮的设计约束）：
+ * - `tone` → 左边那盏灯：**这条途径现在能不能用**（绿 / 红）；
+ * - `identity` → 行右槽：**是哪一份凭据**（掩码 key / 账号名），没有就留空；
+ * - `detail` → 第二行：**它是从哪来的**（凭据取自哪一层 / 脱敏联系方式），没有就不渲染这一行。
  */
-export interface ReadOnlyControlProps {
-  id: string
+export interface SourceStatus {
+  /** 左侧状态灯：`ok` 绿、`missing` 红。 */
+  readonly tone: 'ok' | 'missing'
+  /** 右槽的凭据身份；空串表示这个槽留空（没有身份可报，灯已经说了状态）。 */
+  readonly identity: string
+  /** 第二行的来历；空串表示整个不渲染这一行。 */
+  readonly detail: string
 }
 
 /**
- * 渲染只读输入。
- * @param props - 控件 id。
- * @returns 输入框元素。
+ * 右槽的**临时**内容：正在测、或刚测完。
+ *
+ * 它出现在**凭据身份左侧**，几秒后自己消失 —— 身份**从头到尾都在**，
+ * 不会被它顶掉。替换身份会让那一格闪一下，那正是要避免的突兀。
+ * 因为与身份同处一行、都不换行，出现与消失也**不改变行高**。
  */
-export function ReadOnlyControl(props: ReadOnlyControlProps) {
-  return (
-    <Input
-      id={props.id}
-      // inputStatic 落在官方 Input 的外壳 span 上：内框的静态化规则用后代选择器打进去。
-      className={css.inputStatic}
-      type="text"
-      value=""
-      readOnly
-    />
-  )
-}
+export type SourceLive =
+  | { readonly kind: 'busy' }
+  | { readonly kind: 'result'; readonly ok: boolean; readonly text: string }
 
-/** 二级折叠：卡片里的「自定义设置」。 */
-export interface DetailsGroupProps {
-  title: string
-  /** 初始展开状态；省略即收起。 */
-  defaultOpen?: boolean
-  children: ReactNode
+/** 一条取数途径的状态行。 */
+export interface SourceRowProps {
+  /** 途径名（「API Key」/「账号登录」）。 */
+  label: string
+  status: SourceStatus
+  /** 行首的灯或头像；省略时按 `status.tone` 画灯。 */
+  leading?: ReactNode
+  /** 右槽的临时内容；为 null 时显示 `status.identity`。 */
+  live?: SourceLive | null
+  /** 右槽是否用等宽字体（掩码 key 是标识符，账号名不是）。 */
+  monoIdentity?: boolean
 }
 
 /**
- * 渲染二级折叠「自定义设置」。
+ * 渲染一条取数途径的状态行。
  *
- * **受控但跟手**：`open` 由 state 持有，官方 DisclosureRow 的展开体只在 open 时条件渲染，
- * 卡片每次重渲染（每敲一个字都会）不会把用户展开的块弹回去。
- * @param props - 标题、初始状态与内容。
- * @returns 折叠块元素。
+ * **这是只读展示，不是表单字段**：它不接 `form`，也没有草稿与撤销。
+ * 行首是一盏灯（或账号那行的头像），行名后面**紧跟**凭据身份，第二行才写来历。
+ * 灯 8×8 逐值抄官方 `ui-settings-models` 的 `.credentialDot`。
+ *
+ * **右槽是「临时内容 + 凭据身份」，不是「临时内容或身份」**：身份常驻，
+ * 测试的转圈与结果排在它**左边**，几秒后自行消失。替换身份会让那一格闪一下。
+ * 整槽**永远不换行**（`nowrap` + 省略号）：结果长短不一，一旦换行，行高就会在
+ * 按下去的一瞬间跳一下。
+ * @param props - 名称、状态、临时内容与可选的行首元素。
+ * @returns 状态行元素。
  */
-export function DetailsGroup(props: DetailsGroupProps) {
-  const [open, setOpen] = useState(props.defaultOpen === true)
-  return (
-    <div className={css.details}>
-      <DisclosureRow
-        icon={null}
-        title={props.title}
-        open={open}
-        expandable
-        expandOnRowClick
-        onToggle={() => {
-          setOpen((value) => !value)
-        }}
+export function SourceRow(props: SourceRowProps) {
+  const live = props.live ?? null
+  const identity =
+    props.status.identity === '' ? null : (
+      <span
+        className={clsx(css.sourceIdentity, props.monoIdentity === true && css.sourceIdentityMono)}
+        title={props.status.identity}
       >
-        <div className={css.detailsBody}>{props.children}</div>
-      </DisclosureRow>
+        {props.status.identity}
+      </span>
+    )
+  return (
+    <div className={css.source}>
+      <div className={css.sourceHead}>
+        {props.leading === undefined ? (
+          <span
+            className={clsx(css.dot, props.status.tone === 'ok' ? css.dotOk : css.dotMissing)}
+            aria-hidden="true"
+          />
+        ) : (
+          props.leading
+        )}
+        <span className={css.sourceName}>{props.label}</span>
+        <span className={css.sourceSlot}>
+          {live === null ? null : (
+            // 成功只是通报（polite）；失败要用户处理（assertive）。**不上色**，成败靠图标形状。
+            <span
+              className={css.sourceLive}
+              role={live.kind === 'busy' ? undefined : live.ok ? 'status' : 'alert'}
+            >
+              {live.kind === 'busy' ? (
+                // 官方原语的转圈：`ongoing` 是它唯一带运动的档。
+                <StateDot state="ongoing" size={14} />
+              ) : (
+                <>
+                  {live.ok ? (
+                    <RESULT_ICONS.ok className={css.sourceLiveIcon} />
+                  ) : (
+                    <RESULT_ICONS.fail className={css.sourceLiveIcon} />
+                  )}
+                  <span className={css.sourceLiveText} title={live.text}>
+                    {live.text}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
+          {identity}
+        </span>
+      </div>
+      {props.status.detail === '' ? null : (
+        <p className={css.sourceDetail}>{props.status.detail}</p>
+      )}
     </div>
   )
 }
@@ -318,44 +384,37 @@ export function SelectorControl(props: SelectorControlProps) {
           }}
         >
           {selected?.label ?? ''}
-          <IconChevronDownOutlineRegular className={css.selectorChevron} />
+          <SELECTOR_ICON className={css.selectorChevron} />
         </button>
       }
     />
   )
 }
 
-/** 动作行与它的结果行。 */
+/**
+ * 动作行：一个按钮。
+ *
+ * **它不再带结果行，也不再自己出转圈**（3.0）：测试的动画与结果都发生在**每一行的右槽**里
+ * （结果在那里停留 `RESULT_TTL_MS` 后自行消失）。按钮这边只换文案（「正在测试…」）——
+ * 三处各转一个圈只会让这一小块变吵，而真正要盯的是那两行的右槽。
+ */
 export interface ActionRowProps {
   label: string
   disabled: boolean
-  /** 结果文案；无结果时为 null，此时不渲染结果行。 */
-  result: { readonly ok: boolean; readonly text: string } | null
   onClick: () => void
 }
 
 /**
- * 渲染一个动作按钮与它的状态结果行。
- * @param props - 按钮文案、禁用态、结果与回调。
+ * 渲染一个动作按钮。
+ * @param props - 按钮文案、禁用态与回调。
  * @returns 动作行元素。
  */
 export function ActionRow(props: ActionRowProps) {
   return (
-    <>
-      <div className={css.actions}>
-        <Button type="button" variant="outline" disabled={props.disabled} onClick={props.onClick}>
-          {props.label}
-        </Button>
-      </div>
-      {props.result === null ? null : (
-        // 成功只是通报，用 polite 的 status；失败需要用户处理，按 06 §6.7 的「行内错误」用 alert。
-        <p
-          className={props.result.ok ? css.resultOk : css.resultFail}
-          role={props.result.ok ? 'status' : 'alert'}
-        >
-          {props.result.text}
-        </p>
-      )}
-    </>
+    <div className={css.actions}>
+      <Button type="button" variant="outline" disabled={props.disabled} onClick={props.onClick}>
+        {props.label}
+      </Button>
+    </div>
   )
 }

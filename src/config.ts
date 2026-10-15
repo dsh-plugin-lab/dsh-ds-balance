@@ -1,8 +1,22 @@
 /**
  * 插件配置：schemastery schema、常量与派生值。
  *
- * 字段名与 [UI 侧契约与移交](../docs/UI-HANDOFF.md) 第六节逐字一致，共 **11** 个。
+ * 字段名与 [UI 侧契约与移交](../docs/UI-HANDOFF.md) 第六节逐字一致，共 **9** 个。
  * `timeoutMs` **不在 schema 里**：它是常量加环境变量覆盖，UI 不暴露。
+ *
+ * **本轮删掉两个字段（2.x → 3.0），理由都是「跟随官方」**：
+ * - `apiKey`：它让手改 `settings.yaml` 的人可以静默压过官方那份凭据，而界面读的
+ *   `credentials.describe()` **看不见**它 —— 于是「凭据来源」展示会说假话。
+ * - `baseUrl`：本插件的职责就是**绑定官方**，端点没有第二个合法取值。
+ *   **不能**跟着官方的 `DEEPSEEK_BASE_URL` 走：那个变量是 **Messages 根地址**
+ *   （`https://api.deepseek.com/anthropic`），而余额端点在根域下
+ *   （`GET {root}/user/balance`）—— 照抄会拼出 `.../anthropic/user/balance`，错。
+ *   代价是走内网镜像/自建代理的部署失去了唯一变通办法（契约 §3.2「端点独立」的由来）。
+ *
+ * `apiKeyRef` **保留但不上界面**：它是「读凭据存储里的哪一条」这个输入，
+ * 默认值就是官方那一个（`DEEPSEEK_API_KEY`），而状态展示是**跟着它读**的
+ * （不像 `apiKey` 那样绕开 `describe()`），所以留着一个不可见的逃生舱不构成假话。
+ * 见 [决策记录](../.agents/notes/2026-10-15-drop-apikey-field.md)。
  * @module dsh-ds-balance/config
  */
 
@@ -44,17 +58,17 @@ export const CURRENCY_AUTO = 'auto'
 export const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
 
 /**
- * 生效的端点基址。
+ * 生效的端点基址。**是一个常量，不再是配置项**（3.0 起删掉了 `baseUrl`）。
  *
- * **空串翻译成官方默认地址的唯一一处**：界面默认留空（官方「网页搜索」卡片同款），
- * 用户填了就用填的。抓取与测连接都必须走这里，不许各自判空。
- * @param config - 至少含 `baseUrl` 的配置。
- * @returns 可以直接拼路径的基址。
+ * 真源是 [ports/deepseek-client.ts](ports/deepseek-client.ts) 的 `DEFAULT_BASE_URL`；
+ * 这里转出去，是为了让「抓取」与「测连接」两条路都从一个名字取地址，
+ * 不必各自 import 端口层。
+ *
+ * **端点独立于对话适配器**（契约 §3.2）：本插件打的是官方余额端点
+ * `GET {root}/user/balance`，而官方的 `DEEPSEEK_BASE_URL` 指的是 **Messages 根地址**
+ * （`https://api.deepseek.com/anthropic`）—— 两者拼法不同，所以**不读那个变量**。
  */
-export function endpointOf(config: Pick<Config, 'baseUrl'>): string {
-  const url = config.baseUrl.trim()
-  return url === '' ? DEFAULT_BASE_URL : url
-}
+export const ENDPOINT = DEFAULT_BASE_URL
 
 /** 超时常量。UI 不暴露，改环境变量即可。 */
 export const DEFAULT_TIMEOUT_MS = 8000
@@ -67,12 +81,8 @@ export const TIMEOUT_RANGE = { min: 1000, max: 60_000 } as const
 
 /** 插件配置。 */
 export interface Config {
-  /** DeepSeek API Key。**用户显式覆盖**用；留空则走引用名解析。 */
-  apiKey: string
-  /** 凭据引用名。必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`。 */
+  /** 凭据引用名。必须匹配 `^[A-Za-z_][A-Za-z0-9_]*$`。**不上界面**：默认即官方那一个。 */
   apiKeyRef: string
-  /** 端点基址。**端点独立**，不继承对话适配器；**留空表示用官方默认地址**。 */
-  baseUrl: string
   /** 服务端刷新频率（秒）。 */
   serverRefreshSeconds: number
   /** 客户端轮询频率（秒）。 */
@@ -112,9 +122,7 @@ export type ConfigRefs = { readonly [K in keyof Config]: Volatile<Config[K]> }
  */
 export function readConfig(refs: ConfigRefs): Config {
   return {
-    apiKey: refs.apiKey.get(),
     apiKeyRef: refs.apiKeyRef.get(),
-    baseUrl: refs.baseUrl.get(),
     serverRefreshSeconds: refs.serverRefreshSeconds.get(),
     clientPollSeconds: refs.clientPollSeconds.get(),
     manualRefreshCooldownSeconds: refs.manualRefreshCooldownSeconds.get(),
@@ -134,9 +142,7 @@ export function readConfig(refs: ConfigRefs): Config {
  * 不靠人记。
  */
 export const CONFIG_FIELDS = [
-  'apiKey',
   'apiKeyRef',
-  'baseUrl',
   'serverRefreshSeconds',
   'clientPollSeconds',
   'manualRefreshCooldownSeconds',
@@ -150,7 +156,7 @@ export const CONFIG_FIELDS = [
 /**
  * 配置 schema。加载期校验，非法配置 fail loud。
  *
- * **11 个字段全部 `.volatile()`**，两条独立理由，缺一不可：
+ * **10 个字段全部 `.volatile()`**，两条独立理由，缺一不可：
  * 1. 只有 volatile 字段进得了表单 —— 宿主的 `volatileForm()` 在没有 volatile
  *    字段时返回 `undefined`，该行整条退出 `describe()`，于是
  *    `ctx.configForms.get(ENTRY_ID)` 拿到的快照永远不是 `ready`，
@@ -158,7 +164,7 @@ export const CONFIG_FIELDS = [
  *    漏加一个字段不会报错，只会让那一个字段在表单里消失。
  * 2. 写入路径按 volatile 逐路径放行：非 volatile 路径直接抛
  *    `Config field "..." is not volatile`（宿主 `settings/src/index.ts` 的
- *    `write()`）。`apiKey` 不给它加，`POST /api/v1/config` 就会被宿主拒掉。
+ *    `write()`）。所以每一个要能改的字段都得加。
  *
  * 副作用是好的：全字段 volatile ⇒ Loader 永远判「只有 volatile 变了」⇒
  * 改配置**永不重挂**，`apply` 只跑一次。
@@ -166,9 +172,7 @@ export const CONFIG_FIELDS = [
  * 阈值只在这里存储，前端不做金额比较：颜色由后端的 `severity` 决定。
  */
 export const Config = z.object({
-  apiKey: z.string().role('secret').default('').volatile(),
   apiKeyRef: z.string().role('credential-ref').default(DEFAULT_API_KEY_REF).volatile(),
-  baseUrl: z.string().default('').volatile(),
   serverRefreshSeconds: z.natural().min(10).max(3600).default(60).volatile(),
   clientPollSeconds: z.natural().min(5).max(600).default(30).volatile(),
   manualRefreshCooldownSeconds: z.natural().min(0).max(600).default(30).volatile(),
@@ -270,7 +274,7 @@ export function resolveThresholdPairs(value: Config): {
     if (value[pair.critical] < value[pair.warn]) continue
     violations.push(pair.currency)
     if (config === value) config = { ...value }
-    // 字段名是 `keyof Config`（值类型是 11 个字段的并集），逐键赋值 TS 推不出来，
+    // 字段名是 `keyof Config`（值类型是 9 个字段的并集），逐键赋值 TS 推不出来，
     // 所以走一次数值视图 —— 这对字段在 schema 里本来就是数字。
     const numeric = config as unknown as Record<string, number>
     numeric[pair.warn] = pair.defaultWarn

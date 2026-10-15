@@ -1127,6 +1127,101 @@ describe('注释声称「照官方」的值必须与官方一致', () => {
       `安装的 ui-primitives ${installed.version} 低于声明下限 ${floor}`,
     ).toBeGreaterThanOrEqual(0)
   })
+
+  /**
+   * 分组折叠头是**自绘**的，取值必须与官方那份 CSS 逐值相同。
+   *
+   * 为什么自绘、为什么这条红线必需：原语 `DisclosureRow` 在**展开**时无条件把图标换成
+   * 上箭头（它的 `previewChevron` 只管收起那一支），而我们要的是「常态图标、悬浮才换箭头、
+   * 展开收起都保持」。自绘之后**没有任何编译期信号**能发现我们与官方漂开 ——
+   * 官方把行高从 24 改成 26、字距从 6 改成 8，我们的头只会继续长着旧样子。
+   *
+   * 判据绑到注释点名的那份官方文件（装好的 `ui-primitives`），按「官方选择器 + 属性」显式配对。
+   */
+  it('自绘的分组折叠头：取值与官方 DisclosureRow.module.css 逐值相同', () => {
+    const official = readFileSync(
+      'node_modules/@deepseek-ai/dsh-client-ui-primitives/lib/DisclosureRow.module.css',
+      'utf8',
+    )
+    /**
+     * 读一个规则体内某个属性的值。
+     *
+     * 不复用本组上面那个 `propertyOf`：它只转义选择器的第一个字符，
+     * 遇到 `.leading svg:not([data-state])` 这种带 `:` `(` `[` 的选择器会构造出非法正则；
+     * 而且它假设选择器独占一行，**选择器列表**（`.a,\n.b { }`）读不到。
+     * 这里逐字符转义，并允许选择器出现在列表的任意位置。
+     */
+    const escaped = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const readProp = (text: string, selector: string, property: string): string => {
+      const rule = new RegExp(
+        `(?:^|[},])\\s*${escaped(selector)}\\s*(?:,[^{}]*)?\\{([^}]*)\\}`,
+        'm',
+      ).exec(text)
+      expect(rule, `CSS 里找不到规则 ${selector}`).not.toBeNull()
+      const declaration = new RegExp(`(?:^|;)\\s*${property}:\\s*([^;]+)`).exec(rule?.[1] ?? '')
+      expect(declaration, `规则 ${selector} 里找不到属性 ${property}`).not.toBeNull()
+      // 压成单空格：官方那份有换行与缩进，我们这边夹着注释。
+      return (declaration?.[1] ?? '').replace(/\s+/g, ' ').trim()
+    }
+
+    const pairs: ReadonlyArray<readonly [string, string, string]> = [
+      // 折叠头的行高与文字色（悬浮换色那一条单独比，见下）。
+      ['.groupHead', '.row', 'height'],
+      ['.groupHead', '.row', 'color'],
+      ['.groupHead', '.row', 'transition'],
+      // 图标框：16px 的方框 + 6px 间距。
+      ['.groupLeading', '.leading', 'width'],
+      ['.groupLeading', '.leading', 'height'],
+      ['.groupLeading', '.leading', 'margin-right'],
+      // 框里的字形是 14px（官方用后代选择器把 svg 的 width/height 一起改掉）。
+      ['.groupLeading svg', '.leading svg:not([data-state])', 'width'],
+      ['.groupLeading svg', '.leading svg:not([data-state])', 'height'],
+      // 图标与箭头叠在一起，靠透明度换。
+      ['.groupIcon', '.iconIdle', 'opacity'],
+      ['.groupChevronClosed', '.chevronHover', 'position'],
+      ['.groupChevronClosed', '.chevronHover', 'opacity'],
+      // 标题：字号跟着宿主下发的正文字号档走。
+      ['.groupTitle', '.title', 'font-size'],
+      ['.groupTitle', '.title', 'line-height'],
+    ]
+    for (const [ours, theirs, property] of pairs) {
+      expect(
+        readProp(ourFields, ours, property),
+        `${ours} 的 ${property} 与官方 ${theirs} 不一致`,
+      ).toBe(readProp(official, theirs, property))
+    }
+    // 悬浮换色：官方那两句话（行的 color、图标的 opacity）必须都在我们这边出现。
+    expect(readProp(ourFields, '.groupHead:hover', 'color')).toBe(
+      readProp(official, '.row:hover', 'color'),
+    )
+    expect(readProp(ourFields, '.groupHead:hover .groupIcon', 'opacity')).toBe(
+      readProp(official, '.row:hover .iconIdle', 'opacity'),
+    )
+    expect(readProp(official, '.row:hover', 'color')).toBe('var(--dsw-alias-label-secondary)')
+    expect(readProp(official, '.row:hover .iconIdle', 'opacity')).toBe('0')
+  })
+
+  /**
+   * 折叠头**不退回原语**。
+   *
+   * 退回就等于把那件事重新弄坏：原语展开时必然显示上箭头，而组图标（「这是哪一组」的
+   * 唯一视觉线索）会在展开态消失。这条不是形式主义 —— 本轮修的正是它。
+   */
+  it('折叠头不退回原语，且保留它那套无障碍契约', () => {
+    const code = readFileSync('src/client/settings/fields.tsx', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+    expect(code, 'DisclosureRow 又回到了折叠头（展开态会退回上箭头）').not.toContain(
+      'DisclosureRow',
+    )
+    // 自绘就得自己把那套契约带上：可聚焦、可读的展开态、键盘能开关。
+    expect(code).toContain('aria-expanded')
+    expect(code).toContain('tabIndex')
+    expect(code, '折叠头要能被读屏当成按钮').toContain('role="button"')
+    // 两个箭头都常驻 DOM（互换靠 CSS），不按 open 条件渲染 —— 否则悬浮时会闪。
+    expect(code).toContain('HEADER_CHEVRONS.closed')
+    expect(code).toContain('HEADER_CHEVRONS.open')
+  })
 })
 
 /**
@@ -1435,12 +1530,8 @@ describe('核心活文档的首行标题', () => {
     // 那样「图序对齐」这句就是空话。这条同时是那条正则的行锚定控制。
     expect(
       en.filter((item) => item.startsWith('image:')),
-      '结构指纹里必须取到三张门面图（去掉 `_en` 后缀后两侧同名）',
-    ).toEqual([
-      'image:assets/sidebar-popover.png',
-      'image:assets/settings-cards-position.png',
-      'image:assets/settings-card.png',
-    ])
+      '结构指纹里必须取到两张门面图（去掉 `_en` 后缀后两侧同名）',
+    ).toEqual(['image:assets/sidebar-popover.png', 'image:assets/settings-card.png'])
     expect(shape('README_zh.md'), '中文门面的节序 / 表块 / 图序必须与英文门面逐条对齐').toEqual(en)
     // 反向控制：删掉一节，指纹必须变得不相等。
     const withoutConfig = shape('README.md').filter((item) => item !== 'bullet')

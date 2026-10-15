@@ -3,23 +3,12 @@ import { CREDENTIAL_REF_PATTERN, KeyResolver } from '../src/services/key-resolve
 import { NoKeyError } from '../src/domain/errors.ts'
 import type { Credentials } from '../src/ports/credentials.ts'
 
-const base = { apiKey: '', apiKeyRef: 'DEEPSEEK_API_KEY' }
+const base = { apiKeyRef: 'DEEPSEEK_API_KEY' }
 
 describe('解析链优先级', () => {
-  it('配置里的 apiKey 最优先', async () => {
-    const credentials: Credentials = { resolve: vi.fn(), describe: vi.fn() }
-    const resolver = new KeyResolver({
-      readConfig: () => ({ ...base, apiKey: 'sk-override' }),
-      credentials,
-      env: {},
-    })
-    await expect(resolver.resolve()).resolves.toBe('sk-override')
-    expect(credentials.resolve).not.toHaveBeenCalled()
-  })
-
-  it('其次走凭据服务', async () => {
+  it('**第一档就是凭据服务**（配置覆盖那档已随 apiKey 字段删除）', async () => {
     const credentials: Credentials = {
-      resolve: vi.fn().mockResolvedValue({ value: 'sk-from-store', source: 'env' }),
+      resolve: vi.fn().mockResolvedValue({ value: 'sk-from-store', source: 'file' }),
       describe: vi.fn(),
     }
     const resolver = new KeyResolver({
@@ -28,6 +17,7 @@ describe('解析链优先级', () => {
       env: { DEEPSEEK_API_KEY: 'sk-env' },
     })
     await expect(resolver.resolve()).resolves.toBe('sk-from-store')
+    expect(credentials.resolve).toHaveBeenCalledTimes(1)
   })
 
   it('凭据空值继续走环境变量', async () => {
@@ -74,9 +64,9 @@ describe('失败路径', () => {
     await expect(resolver.resolve()).rejects.toBeInstanceOf(NoKeyError)
   })
 
-  it('两端都空也抛 NoKeyError', async () => {
+  it('引用名是空串时抛 NoKeyError（不再有「两端都空」这一说）', async () => {
     const resolver = new KeyResolver({
-      readConfig: () => ({ apiKey: '  ', apiKeyRef: '  ' }),
+      readConfig: () => ({ apiKeyRef: '  ' }),
       env: {},
     })
     await expect(resolver.resolve()).rejects.toBeInstanceOf(NoKeyError)
@@ -85,7 +75,7 @@ describe('失败路径', () => {
   it('引用名非法直接抛错，不去查凭据', async () => {
     const credentials: Credentials = { resolve: vi.fn(), describe: vi.fn() }
     const resolver = new KeyResolver({
-      readConfig: () => ({ apiKey: '', apiKeyRef: 'deepseek-api-key' }),
+      readConfig: () => ({ apiKeyRef: 'deepseek-api-key' }),
       credentials,
       env: { 'deepseek-api-key': 'sk-x' },
     })
@@ -101,11 +91,19 @@ describe('失败路径', () => {
 })
 
 describe('每次调用现读配置', () => {
-  it('配置改了立刻生效，不需要重建 resolver', async () => {
-    let current = { apiKey: 'sk-first', apiKeyRef: 'DEEPSEEK_API_KEY' }
-    const resolver = new KeyResolver({ readConfig: () => current, env: {} })
+  it('引用名改了立刻生效，不需要重建 resolver', async () => {
+    let current = { apiKeyRef: 'FIRST_KEY' }
+    const resolver = new KeyResolver({
+      readConfig: () => current,
+      env: { FIRST_KEY: 'sk-first', SECOND_KEY: 'sk-second' },
+    })
     await expect(resolver.resolve()).resolves.toBe('sk-first')
-    current = { apiKey: 'sk-second', apiKeyRef: 'DEEPSEEK_API_KEY' }
+    current = { apiKeyRef: 'SECOND_KEY' }
     await expect(resolver.resolve()).resolves.toBe('sk-second')
+  })
+
+  it('describeRef 现读引用名（展示路径也走它，免得另读一份配置）', () => {
+    const resolver = new KeyResolver({ readConfig: () => ({ apiKeyRef: '  MY_KEY  ' }), env: {} })
+    expect(resolver.describeRef()).toBe('MY_KEY')
   })
 })

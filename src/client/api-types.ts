@@ -62,6 +62,14 @@ export interface BalanceResponse {
   /** 这一份数字是哪条取数路给的。标题里的来源标签读它。 */
   source: BalanceSource
   /**
+   * **这条路上用的凭据是哪一份**：掩码 key（首尾片段、不可逆）或账号名。
+   *
+   * **旧宿主没有这个字段**（客户端 HMR 换新、宿主重启才换），所以类型上可选，
+   * 读它必须过形状守卫 —— 见 [model.ts](model.ts) 的 `sourceIdentityOf`。
+   * 没有它时界面退回 `source` 那个路名标签（「（API Key）」），那句话仍然为真。
+   */
+  sourceIdentity?: string | null
+  /**
    * 处境：界面唯一的分支入口。
    *
    * **旧宿主没有这个字段**（客户端 HMR 换新、宿主重启才换），所以类型上可选，

@@ -11,14 +11,18 @@
 - `locales.ts`：中英词典。`zh` 是键集真源，`en` 用 `Record<LocaleKey, string>` 做编译期完整性检查。
   **纯数据，不引宿主类型** —— 命名空间的 module augmentation 放在注册点 [index.tsx](index.tsx)，
   这样测试可以直接 import 词典做键集对账，而不用把宿主拖进程序里。
-  来源标签（`popover.source.key` / `popover.source.account`）**连括号一起放在这里**：中文全角、英文半角带前置空格，
+  来源标签（`popover.source.key` / `popover.source.account`，以及身份那档 `popover.source.identity`）**连括号一起放在这里**：中文全角、英文半角带前置空格，
   代码只做拼接 —— 在代码里写 `(` 必然让其中一种语言不对劲，而那种不对劲只有真机看得见（由 `test/locales.test.ts` 兜）。
   **与包根的 [locale/](../../locale/AGENTS.md) 不是一回事**：那是插件的**展示元数据**（插件页上的标题与描述），
   由宿主直接读那两份 JSON —— 它不进本半边、也不参与渲染，别把两处文案互相抄。
-- `model.ts`：纯函数视图模型。`severity` → 状态点（**只给「有数字」那一族上色**）、**余额占 `warn` 阈值的弧长比例**（`ringRatioOf`，整数比较不走浮点）、金额字符串格式化、**从后端 `selected` 读出展示币种**、相对时间分档、来源标签键。**没有 React，不自己挑币种，也不用阈值配色。**
+- `model.ts`：纯函数视图模型。`severity` → 状态点（**只给「有数字」那一族上色**）、**余额占 `warn` 阈值的弧长比例**（`ringRatioOf`，整数比较不走浮点）、金额字符串格式化、**从后端 `selected` 读出展示币种**、相对时间分档、来源标签键、**凭据身份的形状守卫**（`sourceIdentityOf`）。**没有 React，不自己挑币种，也不用阈值配色。**
 - `situation.ts`：**处境 → 界面形态的唯一映射表**（环 / 中心符号 / 弧长 / 文案键）。`Situation` 闭集与宿主 `domain/situation.ts` 逐字同形；`Record<Situation, …>` 保证完备。收起态的视觉族只有 4 个，**每一处合并都写在表里**。旧宿主的响应没有 `situation` 字段，由 `legacySituationOf` / `situationOfResponse` 现推（形状守卫）。
-- `data.ts`：数据层。向后端要余额（`GET /api/v1/balance` 带 `currency` 与可选的 `provider`）、触发手动刷新、读一次配置里的 `credential` 只读事实，并把「端点不可达」翻成可展示的错误态。**不缓存、不排程** —— 节奏归 `sidebar/`。可注入 `fetchImpl`，因此能脱离浏览器测。
-  - 读宿主的**新增字段一律先过形状守卫**（如 `readCredential`）：客户端半边由 HMR 立刻换新、宿主半边要重启才换，新客户端会读到旧宿主的响应。
+- `data.ts`：数据层。向后端要余额（`GET /api/v1/balance` 带 `currency` 与可选的 `provider`）、触发手动刷新、读两条取数途径的状态（`GET /api/v1/sources`）、测连接（`POST /api/v1/test-connection`，**真打上游**），并把「端点不可达」翻成可展示的错误态。**不缓存、不排程** —— 节奏归 `sidebar/`。可注入 `fetchImpl`，因此能脱离浏览器测。
+  - 读宿主的**新增字段一律先过形状守卫**（`readKeySource` / `readAccountSource`）：客户端半边由 HMR 立刻换新、宿主半边要重启才换，新客户端会读到旧宿主的响应。
+  - `requestSources({ refresh })` 的 `refresh` 让后端绕过它自己的缓存；形状不对时退化成 `unknownSources()` 那份保守快照，**不抛给组件**。
+- `icons.ts`：**本插件用到的全部图标，一处定义**（分组图标 / 选择器 chevron / 浮层图标）。
+  从前它们散在四处 JSX 里，同一个概念各写一份、改一处必漏一处。
+  官方图标集里有语义对得上的就用官方的；没有的（货币）自绘，规格照官方 `icons/index.tsx`。
 - `route-hint.ts`：**「当前会话在用哪条路由」这条提示**，只用来给后端选数据来源（后端认不出来就落全局默认，再不行按固定顺序兜底）。
   - 三条更新路径：切会话（订阅 `uiSession` 主绑定）、**同一会话内换模型**（订阅那个会话的 `modelSelection` 投影，换会话时重绑）、读不到就什么都不说。
   - 宿主客户端服务**全部鸭子类型**（不 import 宿主类型、不为它加依赖）：读不出来只降级，不抛错。
@@ -27,8 +31,8 @@
 - `css-modules.d.ts`：CSS Modules 的环境声明。
 - `mock/`：开发场景数据，见 [mock/README.md](mock/README.md)。**默认走真实端点**：只有 URL 参数 `?dsb=<场景键>` 或 localStorage 明确选过场景才用 mock；`?dsb=live` 会清掉已存的选择并回到真实数据。**11 个处境全都造得出来**（含 `checking` / `offline`），覆盖关系由 `test/mock-scenarios.test.ts` 守着。
   场景切换器**没有接线**：`?dsb-dev` / `isDevMode()` / `setScenario()` / `notifyScenario()` 已于本轮删除（全仓零引用，且配套两条词典键是孤儿键）；要加回来见 [mock/index.ts](mock/index.ts) 的 `subscribeScenario` 注释。
-- `sidebar/`：左下角条目（状态圆环 + 名称）、点击展开的浮层、宿主容器补丁 → [sidebar/README.md](sidebar/README.md)。首拉一次后按 `clientPollSeconds` 轮询缓存；手动刷新先打 `POST /api/v1/balance/refresh` 再读回；**浮层标题右边跟一个来源标签**（`（API Key）` / `（账号登录）`，在链接外、不参与下划线，没有数字时不标）。浮层的刷新按钮带 `data-refreshing` / `data-cooling` 两个状态钩子，供 e2e 断言。
-- `settings/`：四组可折叠的配置卡片、字段控件、暂存与保存状态机、凭据状态读取 → [settings/README.md](settings/README.md)。
+- `sidebar/`：左下角条目（状态圆环 + 名称）、点击展开的浮层、宿主容器补丁 → [sidebar/README.md](sidebar/README.md)。首拉一次后按 `clientPollSeconds` 轮询缓存；手动刷新先打 `POST /api/v1/balance/refresh` 再读回；**浮层标题右边跟一个来源标签**（**优先报哪一份凭据**：打码 key / 账号名；读不到才退回 `（API Key）` / `（账号登录）`。在链接外、不参与下划线，没有数字时不标）。浮层的刷新按钮带 `data-refreshing` / `data-cooling` 两个状态钩子，供 e2e 断言。
+- `settings/`：四组可折叠的配置卡片（连接组默认展开）、字段控件、暂存与保存状态机、两条途径的状态订阅 → [settings/README.md](settings/README.md)。
 
 ## 关键导出
 

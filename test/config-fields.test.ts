@@ -28,8 +28,13 @@ describe('CONFIG_FIELDS', () => {
     expect([...CONFIG_FIELDS].sort()).toEqual([...keys].sort())
   })
 
-  it('字段数就是契约里的 11 个', () => {
-    expect(CONFIG_FIELDS).toHaveLength(11)
+  it('字段数就是契约里的 9 个（3.0 删掉 apiKey 与 baseUrl）', () => {
+    expect(CONFIG_FIELDS).toHaveLength(9)
+  })
+
+  it('**不含** apiKey 与 baseUrl：两个都在 3.0 随「跟随官方」一起删了', () => {
+    expect([...CONFIG_FIELDS] as string[]).not.toContain('apiKey')
+    expect([...CONFIG_FIELDS] as string[]).not.toContain('baseUrl')
   })
 
   it('不含 timeoutMs：它是常量加环境变量覆盖，不进 schema', () => {
@@ -46,7 +51,7 @@ describe('CONFIG_FIELDS', () => {
  * 什么都不显示、也不报错。前端测试看不见它，只有对着 schema 数一遍才拦得住。
  */
 describe('volatile 面', () => {
-  it('11 个字段一个不漏，全部带 volatile', () => {
+  it('9 个字段一个不漏，全部带 volatile', () => {
     const missing = [...CONFIG_FIELDS].filter((field) => !isVolatile(field))
     expect(missing, `这些字段没加 .volatile()：${missing.join(', ')}`).toEqual([])
   })

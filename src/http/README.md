@@ -19,9 +19,10 @@
 |---|---|---|
 | GET | `/api/v1/balance` | 余额视图；`currency` 覆盖 `displayCurrency`，`provider` 是**当前会话路由**这条提示（缺席则按全局默认判） |
 | POST | `/api/v1/balance/refresh` | 手动刷新；请求体 `{ reason, provider }` 都可省略 |
-| GET | `/api/v1/config` | 读配置（`apiKey` 只回掩码 + 一段 `credential` 只读事实） |
+| GET | `/api/v1/config` | 读配置（9 个字段；**密钥不在这个端点里**） |
 | POST | `/api/v1/config` | 写配置；形状或取值不合法一律 `422` |
-| POST | `/api/v1/test-connection` | 测连接；**不动活动缓存** |
+| GET | `/api/v1/sources` | 两条取数途径的状态（「连接」组的唯一出口）；`?refresh=1` 强制重读 |
+| POST | `/api/v1/test-connection` | 测连接；**真打上游**，`{ source? }` 选测哪条途径 |
 | GET | `/api/v1/healthz` | **处境** / 状态 / **当前活跃来源** / 调度 / 存储健康 / 版本 / 指标聚合值 |
 
 `provider` 只当提示：认不出来或没给就按全局默认路由判，两条都不可用按固定顺序兜底 —— 见 §6.3。
@@ -30,9 +31,13 @@
 **写配置走 POST 而不是 PUT**：平台只支持 `GET` / `HEAD` / `POST` 三档方法。
 契约文档写的是 PUT，以平台实际能力为准。
 
+`sources` 里的 `key.masked` 是**首尾片段掩码**（`sk-cf08d*****3b84`，与平台控制台同形）——
+**完整密钥永不进响应体**，后端解析出明文后立刻折成掩码再丢掉。详见 [AGENTS.md](AGENTS.md) 与
+[domain/credential.ts](../domain/credential.ts)。
+
 `config` 响应里的 `credential` 段是官方 `credentialProvider.describe()` 的逐字形状
 （`{ ref, configured, source, writable }`）—— **只有三个事实，没有装值的槽**。
-凭据端口缺席、引用名非法或 `describe` 抛错时回 `null`，界面据此把凭据字段当只读。
+凭据端口缺席、引用名非法或 `describe` 抛错时回 `null`。
 
 ## 使用约束与工作偏好
 

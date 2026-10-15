@@ -18,6 +18,9 @@ export const zh = {
   // 代码里只做拼接，绝不写死括号字符。
   'popover.source.key': '（API Key）',
   'popover.source.account': '（账号登录）',
+  // 有身份时用它替掉上面那两句：括号里直接放「哪一把凭据」。括号照旧在词典里
+  // （中文全角、英文半角带前置空格），`{identity}` 由 interpolate 填。
+  'popover.source.identity': '（{identity}）',
   'popover.total': '余额',
   'popover.granted': '赠送',
   'popover.toppedUp': '充值',
@@ -64,9 +67,6 @@ export const zh = {
   'settings.group.refresh': '刷新',
   'settings.group.display': '展示',
   'settings.group.thresholds': '阈值',
-  'settings.field.apiKey': 'API Key',
-  'settings.field.apiKeyRef': 'API 密钥引用名',
-  'settings.field.baseUrl': '接口地址',
   'settings.field.serverRefreshSeconds': '服务端刷新频率（秒）',
   'settings.field.clientPollSeconds': '客户端轮询频率（秒）',
   'settings.field.manualRefreshCooldownSeconds': '手动刷新冷却（秒）',
@@ -75,8 +75,38 @@ export const zh = {
   'settings.field.cnyCritical': 'CNY 告急',
   'settings.field.usdWarn': 'USD 预警',
   'settings.field.usdCritical': 'USD 告急',
-  'settings.hint.apiKeyRef': '凭据存储里的条目名；非空时优先于 API Key。',
-  'settings.hint.baseUrl': '留空则使用提供方默认地址。',
+
+  // ── 「连接」组：两条取数途径的只读状态 ──────────────────────────
+  // 措辞逐条对齐官方：账号那几句取自 ui-settings-account 的 signedIn / signedOut /
+  // profileUnavailable；密钥那几句取自 ui-settings-models 的 apiKeySet / apiKeyUnset。
+  // 官方那套词在 settings.account / settings.models 命名空间，别的插件拿不到，所以抄进来。
+  //
+  // **3.0 起这一段只剩两句话**：组级说明 + 每行第二行的「来历」。
+  // 状态徽章（已配置密钥。/ 未配置密钥。…）整套删了 —— 它与左边那盏灯说同一件事，
+  // 而「一个事实说两遍」正是本轮要消掉的东西。判据见 source-status.ts。
+  'settings.sources.title': '取数途径',
+  'settings.sources.key': 'API Key',
+  'settings.sources.account': '账号登录',
+  // 组级说明：一句替掉原来每行各一句的近义说明。
+  'settings.sources.groupNote':
+    '两条途径都跟随官方：密钥用官方模型页配好的那一份，账号用宿主已登录的那个。本插件不自己保存凭据。',
+  // 第二行的「来历」：这把凭据是从哪一层取到的。取值来自官方 describe() 的 source。
+  'settings.sources.sourceSaved': '取自官方模型页保存的凭据',
+  'settings.sources.sourceEnv': '取自启动环境变量 {name}',
+  'settings.sources.sourceUnknown': '来源未确认',
+  // 账号那条唯一需要说出来的一句：那是**部署事实**，用户做什么都没用；
+  // 而整行留空会被读成「插件坏了」。未登录不说 —— 它是正常状态。
+  'settings.sources.accountNoService': '本部署没有账号服务，这条途径不可用。',
+  // 测试。结果借每行右槽显示 4 秒（排在凭据身份**左边**，所以身份不会被顶掉），
+  // 所以文案要短。成败由**官方那对圆圈图标**表达（check-circle / close-circle），
+  // 不用 `✓` / `✗` 字符：字符的基线、字重、间距都跟着字体走，与旁边那行等宽掩码并排会歪。
+  'settings.test': '测试',
+  'settings.testing': '正在测试…',
+  'settings.test.ok': '{ms}ms',
+  'settings.test.noKey': '没有可用凭据',
+  'settings.test.notSignedIn': '尚未登录',
+  'settings.test.fail': '连接失败：{message}',
+
   'settings.hint.displayCurrency': '所选币种不存在时，回落到账户实际持有的币种。',
   'settings.hint.threshold': '后端判定；界面颜色跟随返回的严重度。',
   'settings.hint.thresholdPair': '告急值必须低于预警值',
@@ -84,18 +114,6 @@ export const zh = {
   'settings.hint.clientPollSeconds': '刷新显示的间隔；正常时只读缓存，读不到时才访问上游。',
   'settings.hint.manualRefreshCooldownSeconds': '两次手动刷新之间的最短间隔。',
   'settings.currency.auto': '自动（跟随账户）',
-  // 凭据行的**状态徽章**：两条逐字用官方措辞 —— 取自 ui-settings-plugins 的
-  // webSearchApiKeySet / webSearchApiKeyUnset（后者去掉搜索相关的后半句）。
-  'settings.credential.configured': '已配置密钥。',
-  'settings.credential.notConfigured': '未配置密钥。',
-  // 凭据行下方的说明。官方 webSearchApiKeyHint 是一句与状态无关的常量说明，这里照做：
-  // 状态由徽章交代，说明只讲字段契约。
-  'settings.hint.credential': '不写入设置文件。留空表示保持当前密钥。',
-  'settings.group.customized': '自定义设置',
-  'settings.test': '测试连接',
-  'settings.testing': '测试中…',
-  'settings.test.ok': '连接正常。',
-  'settings.test.fail': '连接失败：{message}',
   'settings.save': '保存',
   'settings.saving': '保存中…',
   'settings.failed': '保存失败，请重试。',
@@ -131,6 +149,7 @@ export const en: Record<LocaleKey, string> = {
   'popover.title': 'Account balance',
   'popover.source.key': ' (API key)',
   'popover.source.account': ' (account sign-in)',
+  'popover.source.identity': ' ({identity})',
   'popover.total': 'Balance',
   'popover.granted': 'Granted',
   'popover.toppedUp': 'Topped up',
@@ -158,9 +177,6 @@ export const en: Record<LocaleKey, string> = {
   'settings.group.refresh': 'Refresh',
   'settings.group.display': 'Display',
   'settings.group.thresholds': 'Thresholds',
-  'settings.field.apiKey': 'API key',
-  'settings.field.apiKeyRef': 'API key reference',
-  'settings.field.baseUrl': 'Endpoint',
   'settings.field.serverRefreshSeconds': 'Server refresh (seconds)',
   'settings.field.clientPollSeconds': 'Client poll (seconds)',
   'settings.field.manualRefreshCooldownSeconds': 'Manual refresh cooldown (seconds)',
@@ -169,8 +185,25 @@ export const en: Record<LocaleKey, string> = {
   'settings.field.cnyCritical': 'CNY critical',
   'settings.field.usdWarn': 'USD warning',
   'settings.field.usdCritical': 'USD critical',
-  'settings.hint.apiKeyRef': 'Credential store entry name; takes precedence over the API key.',
-  'settings.hint.baseUrl': 'Leave blank to use the provider default.',
+
+  // 与 zh 逐条对应，理由写在 zh 那一段。
+  'settings.sources.title': 'Balance sources',
+  'settings.sources.key': 'API key',
+  'settings.sources.account': 'Account sign-in',
+  'settings.sources.groupNote':
+    'Both sources follow the official setup: the key comes from the official Models page, the account is the one signed in to the host. This plugin stores no credential of its own.',
+  'settings.sources.sourceSaved': 'From the credential saved on the Models page',
+  'settings.sources.sourceEnv': 'From the launch env var {name}',
+  'settings.sources.sourceUnknown': 'Source unconfirmed',
+  'settings.sources.accountNoService':
+    'This deployment ships no account service, so this source is unavailable.',
+  'settings.test': 'Test',
+  'settings.testing': 'Testing…',
+  'settings.test.ok': '{ms}ms',
+  'settings.test.noKey': 'No credential available',
+  'settings.test.notSignedIn': 'Not signed in',
+  'settings.test.fail': 'Connection failed: {message}',
+
   'settings.hint.displayCurrency': 'Falls back to a currency the account actually holds.',
   'settings.hint.threshold': 'Decided on the server; the UI colour follows the returned severity.',
   'settings.hint.thresholdPair': 'Critical must be lower than warning',
@@ -178,15 +211,6 @@ export const en: Record<LocaleKey, string> = {
   'settings.hint.clientPollSeconds': 'How often the display refreshes; cache-only while healthy.',
   'settings.hint.manualRefreshCooldownSeconds': 'Minimum gap between two manual refreshes.',
   'settings.currency.auto': 'Automatic (follow account)',
-  'settings.credential.configured': 'A key is configured.',
-  'settings.credential.notConfigured': 'No key is configured.',
-  'settings.hint.credential':
-    'Stored outside the settings file. Leave blank to keep the current key.',
-  'settings.group.customized': 'Customized settings',
-  'settings.test': 'Test connection',
-  'settings.testing': 'Testing…',
-  'settings.test.ok': 'Connection looks good.',
-  'settings.test.fail': 'Connection failed: {message}',
   'settings.save': 'Save',
   'settings.saving': 'Saving…',
   'settings.failed': 'Saving failed. Try again.',

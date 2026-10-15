@@ -37,7 +37,7 @@ function state(patch: Partial<FieldState> = {}): FieldState {
 /**
  * 造一份合法的基础配置。
  *
- * `Config({})` 现在返回的是**引用面**（11 个字段都是 `Volatile`），
+ * `Config({})` 现在返回的是**引用面**（9 个字段都是 `Volatile`），
  * 而这里的判据要的是纯值，所以先解引用 —— 走一次 unknown 是因为两者的
  * 字段类型在类型系统里本来就不重叠。
  */

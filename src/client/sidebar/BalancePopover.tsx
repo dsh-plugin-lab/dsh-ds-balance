@@ -209,8 +209,14 @@ export function BalancePopover(props: BalancePopoverProps): JSX.Element {
           </a>
 
           {/* 来源标签是**链接外面的普通文本**：它描述这个数字的来路，不是官网用量页的入口 ——
-              放进链接里它会跟着下划线，读起来像标题的一部分。括号由词典给，这里只做拼接。 */}
-          {sourceLabel === null ? null : <span className={css.sourceLabel}>{sourceLabel}</span>}
+              放进链接里它会跟着下划线，读起来像标题的一部分。括号由词典给，这里只做拼接。
+              它显示的是**凭据身份**（掩码 key / 账号名），可能被 CSS 省略号截断，
+              所以 `title` 补一份完整值。 */}
+          {sourceLabel === null ? null : (
+            <span className={css.sourceLabel} title={sourceLabel}>
+              {sourceLabel}
+            </span>
+          )}
         </span>
 
         {/* 右上角：无可见文字的图标按钮，点了去本插件的配置格；宿主没有那条深链服务时

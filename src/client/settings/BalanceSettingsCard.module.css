@@ -22,7 +22,42 @@
   padding-top: 16px;
 }
 
-/* 保存失败：需要用户动手，用状态错误色。 */
+/* 保存按钮。取值逐条照官方 `ui-primitives/src/settings-form/SettingsForm.module.css` 的 `.save`
+   —— 官方整个设置表单的保存键就是这个形态，我们从前用的是原语 `Button variant="primary"`，
+   两者外观接近但不是同一个东西（官方那个是裸 button + 自己的 padding / 圆角 / 底色）。
+   两处**有意偏离**，都写在这里免得下一个人以为是抄漏：
+   1. 焦点环**裸引** `--dsw-focus-ring-color`，官方那份写了回落
+      （`var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary))`）。
+      本仓声明的是 RC 线，该 token 一定存在，回落是死代码 ——
+      [test/redlines.test.ts](../../../test/redlines.test.ts) 的「裸引」那条会红。
+   2. 失败文案用 `--dsw-alias-state-error-primary`（见下面 `.failed`）：官方写的
+      `--dsw-alias-label-error` 从未定义，照抄会静默失效。 */
+.save {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md);
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-layer-3);
+}
+
+.save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.save:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: 1px;
+}
+
+/* 保存失败：需要用户动手，用状态错误色。
+   官方 `.failed` 写的是 `--dsw-alias-label-error`，那个 token **从未定义**（照抄会静默失效），
+   所以这里用 `--dsw-alias-state-error-primary` —— 这是本仓既有的一条偏离，不是抄漏。 */
 .failed {
   flex: 1;
   min-width: 0;

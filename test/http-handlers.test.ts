@@ -13,6 +13,7 @@ import { accountReader, keyReader } from '../src/services/source-readers.ts'
 import { ConfigService, type ConfigSource } from '../src/services/config-service.ts'
 import { KeyResolver } from '../src/services/key-resolver.ts'
 import { Scheduler } from '../src/services/scheduler.ts'
+import { SourcesService } from '../src/services/sources-service.ts'
 import { PLUGIN_VERSION } from '../src/version.ts'
 import {
   handleBalance,
@@ -20,9 +21,11 @@ import {
   handleConfigUpdate,
   handleHealthz,
   handleRefresh,
+  handleSources,
   handleTestConnection,
   type HttpDeps,
 } from '../src/http/handlers.ts'
+import type { Credentials } from '../src/ports/credentials.ts'
 
 const NOW = 1_760_000_000_000
 /** 处理只解析 URL，不真的连出去，所以用哪个源都行。 */
@@ -33,9 +36,7 @@ const clock: Clock = { now: () => NOW, timezone: () => 'Asia/Shanghai' }
 
 /** 配置基线；与 schema 默认值一致。 */
 const baseConfig: Config = {
-  apiKey: '',
   apiKeyRef: 'DEEPSEEK_API_KEY',
-  baseUrl: 'https://api.deepseek.com',
   serverRefreshSeconds: 60,
   clientPollSeconds: 30,
   manualRefreshCooldownSeconds: 30,
@@ -91,10 +92,14 @@ interface HarnessOptions {
   respond?: () => Promise<RawBalanceResponse>
   testResult?: TestConnectionResult
   metrics?: Metrics
+  /** 凭据服务替身；省略时 `sources` 的来源层读不到。 */
+  credentials?: Credentials
 }
 
 interface Harness {
   deps: HttpDeps
+  /** 账号替身，用例可直接翻它的行为。 */
+  account: AccountSource
   setConfig(patch: Partial<Config>): void
   balanceCalls(): number
   updates(): Array<Record<string, unknown>>
@@ -123,12 +128,11 @@ function harness(options: HarnessOptions = {}): Harness {
     },
   }
   const config = new ConfigService({ source, env: {} })
+  // 密钥从环境变量那一档进来（配置覆盖那档已随 `apiKey` 字段删除，3.0）。
+  // `key: null` 表示整条链都取不到值。
   const keys = new KeyResolver({
-    readConfig: () => ({
-      apiKey: options.key === null ? '' : (options.key ?? 'test-key'),
-      apiKeyRef: 'DEEPSEEK_API_KEY',
-    }),
-    env: {},
+    readConfig: () => ({ apiKeyRef: 'DEEPSEEK_API_KEY' }),
+    env: options.key === null ? {} : { DEEPSEEK_API_KEY: options.key ?? 'test-key' },
   })
   let calls = 0
   const client: DeepSeekClient = {
@@ -154,9 +158,11 @@ function harness(options: HarnessOptions = {}): Harness {
     async close() {},
   }
   // 账号那条路在 handler 层的用例里默认不可用：这些用例守的是端点形状与 Key 那条链。
+  // `profile()` 也是接口的一部分（「连接」组要用它拿名字与头像），所以替身必须给。
   const account: AccountSource = {
     signedIn: async () => false,
     accountId: async () => null,
+    profile: async () => null,
     readBalance: async () => null,
   }
   const ledgers = new Map<BalanceSource, SourceLedger>([
@@ -192,8 +198,16 @@ function harness(options: HarnessOptions = {}): Harness {
     timers: { set: () => 0, clear: () => {} },
     now: () => NOW,
   })
+  // 两条途径的状态：「连接」组的唯一事实出口。
+  const sources = new SourcesService({
+    keys,
+    credentials: options.credentials,
+    account: () => account,
+    salt: 'test-salt',
+  })
   return {
-    deps: { service, config, keys, client, store, scheduler },
+    deps: { service, config, keys, client, store, scheduler, sources, account: () => account },
+    account,
     setConfig: (patch) => {
       current = { ...current, ...patch }
     },
@@ -308,27 +322,22 @@ describe('POST /api/v1/balance/refresh', () => {
 })
 
 describe('GET /api/v1/config', () => {
-  it('永不回传 apiKey 本身', async () => {
-    const h = harness({ config: { apiKey: 'sk-super-secret' } })
+  it('**密钥不在这个端点里**：apiKey 字段已删，响应里连掩码都没有了', async () => {
+    // 掩码搬去了 GET /api/v1/sources（那是「连接」组的唯一事实出口），
+    // 而它回的是首尾片段形态（见下面的 sources 用例）。这个端点只回配置。
+    const h = harness({ key: 'sk-super-secret' })
     const response = await handleConfigGet(get('/api/v1/config'), h.deps)
     const text = await response.clone().text()
     expect(text).not.toContain('sk-super-secret')
     const json = await readJson(response)
     expect(json.config.apiKey).toBeUndefined()
-    expect(json.apiKeyMasked).toBe('********')
+    expect(json.apiKeyMasked).toBeUndefined()
   })
 
-  it('未配置 apiKey 时掩码是空串', async () => {
-    const h = harness({ config: { apiKey: '' } })
-    expect(
-      (await readJson(await handleConfigGet(get('/api/v1/config'), h.deps))).apiKeyMasked,
-    ).toBe('')
-  })
-
-  it('掩码是手动的：除 apiKey 外十个字段全在，超时不在 schema 里', async () => {
-    const h = harness({ config: { apiKey: 'sk-x' } })
+  it('配置字段全在（9 个），超时不在 schema 里', async () => {
+    const h = harness()
     const json = await readJson(await handleConfigGet(get('/api/v1/config'), h.deps))
-    expect(Object.keys(json.config)).toHaveLength(CONFIG_FIELDS.length - 1)
+    expect(Object.keys(json.config)).toHaveLength(CONFIG_FIELDS.length)
     expect(json.config.displayCurrency).toBe('auto')
     expect(json.timeoutMs).toBe(DEFAULT_TIMEOUT_MS)
   })
@@ -403,6 +412,60 @@ describe('POST /api/v1/config', () => {
     const response = await handleConfigUpdate(post('/api/v1/config', {}), h.deps)
     expect(response.status).toBe(200)
     expect(h.updates()).toEqual([])
+  })
+})
+
+describe('GET /api/v1/sources', () => {
+  it('两条途径一次给全：Key 带掩码与账本标识，账号带登录态', async () => {
+    const h = harness({ key: 'sk-cf08d1234567890abcd3b84' })
+    const json = await readJson(await handleSources(get('/api/v1/sources'), h.deps))
+    expect(json.schemaVersion).toBe(1)
+    expect(json.key.ref).toBe('DEEPSEEK_API_KEY')
+    expect(json.key.configured).toBe(true)
+    expect(json.key.masked).toBe('sk-cf08d*****3b84')
+    expect(json.key.tag8).toHaveLength(8)
+    expect(json.account.available).toBe(true)
+    expect(json.account.signedIn).toBe(false)
+  })
+
+  it('**响应里不出现完整密钥**（掩码是唯一的密钥形态）', async () => {
+    const secret = 'sk-cf08d1234567890abcd3b84'
+    const h = harness({ key: secret })
+    const response = await handleSources(get('/api/v1/sources'), h.deps)
+    const text = await response.clone().text()
+    expect(text).not.toContain(secret)
+    expect(text).not.toContain('1234567890abcd')
+  })
+
+  it('没有凭据时 configured 为假、掩码为空串，仍是 200', async () => {
+    const h = harness({ key: null })
+    const response = await handleSources(get('/api/v1/sources'), h.deps)
+    expect(response.status).toBe(200)
+    const json = await readJson(response)
+    expect(json.key.configured).toBe(false)
+    expect(json.key.masked).toBe('')
+  })
+
+  it('账号已登录时带出名字与头像', async () => {
+    const h = harness({ key: 'sk-x' })
+    Object.assign(h.account, {
+      signedIn: async () => true,
+      profile: async () => ({
+        name: '张三',
+        avatarUrl: 'https://example.test/a.png',
+        contact: null,
+      }),
+    })
+    const json = await readJson(await handleSources(get('/api/v1/sources'), h.deps))
+    expect(json.account.signedIn).toBe(true)
+    expect(json.account.name).toBe('张三')
+    expect(json.account.avatarUrl).toBe('https://example.test/a.png')
+  })
+
+  it('revision 是一个数（界面拿它当「有没有东西换了」的判据）', async () => {
+    const h = harness({ key: 'sk-x' })
+    const json = await readJson(await handleSources(get('/api/v1/sources'), h.deps))
+    expect(typeof json.revision).toBe('number')
   })
 })
 
@@ -503,7 +566,7 @@ describe('指标', () => {
 
 describe('配置响应里的凭据事实', () => {
   it('带上 describe 的三个事实，且不含任何密钥片段', async () => {
-    const h = harness({ config: { apiKey: '' } })
+    const h = harness({ key: 'sk-x' })
     const withCredentials: HttpDeps = {
       ...h.deps,
       credentials: {

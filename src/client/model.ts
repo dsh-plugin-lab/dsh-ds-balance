@@ -231,6 +231,22 @@ export function sourceLabelKeyOf(source: string | undefined | null): SourceLabel
 }
 
 /**
+ * 读响应里那条「这份数字用的是哪一份凭据」（掩码 key / 账号名）。
+ *
+ * **形状守卫**：这个字段是后加的，而客户端半边由 HMR 立刻换新、宿主半边要重启才换 ——
+ * 于是「新客户端 + 旧宿主」是合法中间态，旧宿主根本不回这个字段。
+ * 不是非空字符串就当没有（界面退回路名标签），绝不把 `undefined` 漏进渲染。
+ * @param response - 余额响应。
+ * @returns 身份；没有或形状不对时 `null`。
+ */
+export function sourceIdentityOf(response: BalanceResponse): string | null {
+  const value = response.sourceIdentity
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
+/**
  * 一次手动刷新之后的冷却截止时刻。
  *
  * **基准是「拿到结果那一刻」**，不是点击那一刻：后端的手动冷却从它收到请求起算，

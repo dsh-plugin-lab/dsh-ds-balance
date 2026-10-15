@@ -1,9 +1,108 @@
 /* 配置字段的行、控件与提示。取值逐条对齐官方 ui-settings-plugins/fields.module.css。 */
 
-/* 分组：折叠头与展开体的容器。布局由 DisclosureRow 的 .root（flex column / width 100%）提供，
-   这里只补卡片自己的分组间距。 */
+/* 分组：折叠头与展开体的容器。
+   折叠头**自绘**（不用原语 DisclosureRow），理由写在 [fields.tsx](fields.tsx) 的 FieldGroup 上：
+   原语在展开态无条件把图标换成上箭头，而我们要的是「常态图标、悬浮才换箭头」。
+   前四行是原语 `.root` 原本提供的（它才是今天渲染的那一层），自绘之后得自己带上 ——
+   少了 `min-width: 0` 会在窄视口里让折叠头撑破卡片。 */
 .group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
   padding: 12px 0 0;
+}
+
+/* ── 折叠头 ────────────────────────────────────────────────────────
+   下面这一组取值**逐条照抄官方** `ui-primitives/src/DisclosureRow.module.css`
+   （`.row` / `.leading` / `.iconIdle` / `.chevronHover` / `.title`）：
+   24px 行高、16px 图标框、14px 字形、6px 间距、tertiary → 悬浮 secondary、100ms 过渡。
+   改这里的任何一个数都得同步改那边 —— [test/redlines.test.ts](../../../test/redlines.test.ts)
+   有「注释声称照官方」那组会逐值比对，漂了会红。
+   `--dsh-content-font-*` 是官方的**正文字号档**令牌（设置里的字号偏好经由它下发），
+   所以行高与图标框都跟着 `--dsh-content-font-delta` 走 —— 这也是照抄的一部分。 */
+.groupHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: calc(24px + var(--dsh-content-font-delta, 0px));
+  min-width: 0;
+  color: var(--dsw-alias-label-tertiary);
+  transition: color 100ms ease;
+  cursor: pointer;
+}
+
+.groupHead:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* 焦点环由宿主全局的 `:focus-visible` 规则画（ui-theme/styles/focus.css），这里不重画 ——
+   重画一份就是第二个所有者，迟早与宿主的宽度/颜色漂开。 */
+
+.groupLeading {
+  position: relative;
+  flex: none;
+  width: calc(16px + var(--dsh-content-font-delta, 0px));
+  height: calc(16px + var(--dsh-content-font-delta, 0px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+}
+
+.groupLeading svg {
+  width: calc(14px + var(--dsh-content-font-delta, 0px));
+  height: calc(14px + var(--dsh-content-font-delta, 0px));
+}
+
+.groupIcon {
+  display: inline-flex;
+  opacity: 1;
+  transition: opacity 100ms ease;
+}
+
+/* 两个箭头叠在图标框正中；常态都透明，只有悬浮/键盘聚焦时对应方向那个才亮。
+   `pointer-events: none` 不能让它们抢走点击 —— 点击目标是整个 `.groupHead`。 */
+.groupChevronClosed,
+.groupChevronOpen {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+/* 展开态显上箭头、收起态显下箭头；两者都只在悬浮或键盘聚焦时出现。 */
+.groupHead[aria-expanded='false']:hover .groupChevronClosed,
+.groupHead[aria-expanded='false']:focus-visible .groupChevronClosed,
+.groupHead[aria-expanded='true']:hover .groupChevronOpen,
+.groupHead[aria-expanded='true']:focus-visible .groupChevronOpen {
+  opacity: 1;
+}
+
+.groupHead:hover .groupIcon,
+.groupHead:focus-visible .groupIcon {
+  opacity: 0;
+}
+
+.groupTitle {
+  flex: none;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .groupHead {
+    transition: none;
+  }
+
+  .groupIcon,
+  .groupChevronClosed,
+  .groupChevronOpen {
+    transition: none;
+  }
 }
 
 /* 最后一组的尾部间距由分组自己出，值等于组间距，收尾与别处一样宽。
@@ -39,6 +138,104 @@
 
 .detailsBody {
   padding-top: 10px;
+}
+
+/* ── 取数途径的状态行（只读展示，不是表单字段） ──────────────────── */
+
+/* 行结构：头部一行（灯 / 头像 + 名称 + **右槽的凭据身份**），下面跟一行来历。
+   只有两行，而且第二行缺席时整行就一行 —— 没有第三条「结果行」。 */
+.source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+}
+
+.sourceHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 状态点：8×8 实心圆，逐值抄官方 ui-settings-models 的 .credentialDot。
+   **必须是真的圆**（它不是控件圆角），所以成对写 50% + corner-shape: round。 */
+.dot {
+  box-sizing: border-box;
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+.dotOk {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.dotMissing {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+.sourceName {
+  flex: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 右槽：**临时内容 + 凭据身份**并排，身份常驻、临时内容排在它左边。
+   `justify-content: flex-end` 把这一串推到行尾；`min-width: 0` + 子项的省略号
+   保证它**永不换行** —— 测试结果长短不一，一旦换行，按下去的那一瞬行高就会跳。 */
+.sourceSlot {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sourceIdentity,
+.sourceLiveText {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* 掩码 key 是标识符，用等宽；账号名是人名，不用。 */
+.sourceIdentityMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 临时区（转圈 / 成败图标 + 那句话）。
+   它自己 `flex: 0 1 auto` 可收缩，所以窄卡片上先挤它、不动身份 ——
+   身份是稳定事实，临时内容看完就没。 */
+.sourceLive {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 成败图标不参与换行，也不跟着文字一起被压扁。 */
+.sourceLiveIcon {
+  flex: none;
+}
+
+/* 第二行：凭据是从哪一层取到的（或脱敏联系方式）。是一句话，不是标识符栏，
+   所以**不吃等宽字体** —— 里面那一段变量名不足以让整行变等宽。 */
+.sourceDetail {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* 上下结构字段：标签行、控件、说明行。 */
@@ -287,23 +484,9 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-/* 动作行（测试连接）与结果行。 */
+/* 动作行（Test 按钮）。 */
 .actions {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.resultOk {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--dsw-alias-state-success-primary);
-}
-
-.resultFail {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--dsw-alias-state-error-primary);
 }

@@ -8,9 +8,18 @@
 ## 文件
 
 - `account-tag.ts`：`computeAccountTag(salt, apiKey)`（HMAC-SHA256 前 32 hex）与 `accountTag8`（日志用前 8 位）。**不可逆、不含明文。**
-- `key-resolver.ts`：`KeyResolver` 与 `CREDENTIAL_REF_PATTERN`。解析链 = 配置 `apiKey` → `credentials.resolve(apiKeyRef)` → `process.env[apiKeyRef]` → 抛 `NoKeyError`。
+- `key-resolver.ts`：`KeyResolver`、`CREDENTIAL_REF_PATTERN` 与 `ENV_SOURCE`。解析链 = `credentials.resolve(apiKeyRef)` → `process.env[apiKeyRef]` → 抛 `NoKeyError`（**3.0 起删掉了第一档「配置 `apiKey`」**，理由见[决策记录](../../.agents/notes/2026-10-15-drop-apikey-field.md)）。
   - **无 credentials seam 时吞掉异常继续往下**，不让它变成整个插件的失败。
   - **每次调用现读配置**，用户改了立刻生效。
+  - `resolveWithSource()` 一并回报「值从哪一档来的」：展示路径要用它，而**判据只能有一份** ——
+    让消费方自己再读一遍环境变量就是第二份判据，两者迟早会漂。`resolve()` 是它的薄包装。
+  - `describeRef()` 现读生效的引用名：展示路径也走它，免得另读一份配置。
+- `sources-service.ts`：`SourcesService`。两条取数途径（API Key / 账号登录）的只读状态，
+  **「连接」组的唯一事实出口**。带缓存与「凭据世代」（`revision`），
+  由 `invalidate()` 作废 —— 宿主半边订阅凭据变更事件后调它。
+  - 明文密钥只在这里出现一次：解析 → 折成掩码与账本标识 → 丢掉。
+  - **账号身份是一次真上游请求**（宿主 `getProfile` 每次打 Platform），所以必须缓存；
+    未登录时**不问身份**，省掉一次注定失败的调用。
 - `config-service.ts`：`ConfigService` 与 `ConfigSource`。薄封装设置作用域：现读、订阅、派生阈值；`timeoutMs()` **每次现读环境变量**。
 - `balance-source.ts`：`SourceLedger` 与 `SourceReader`。**一个来源一份账本**：快照、状态机、失败退避、手动冷却都在这里。
   - **对外永不抛错**：一切失败变成 `view.state` 与 `view.error`。
