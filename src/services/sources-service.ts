@@ -98,7 +98,7 @@ export class SourcesService {
   /**
    * 强制重读一次并换掉缓存。
    *
-   * 调用时机：卡片打开、窗口重新获得焦点、点「测试两条途径」、以及凭据变更事件之后。
+   * 调用时机：卡片打开、窗口重新获得焦点、点 **Test**、以及凭据变更事件之后。
    * @returns 新快照。
    */
   async refresh(): Promise<SourcesSnapshot> {

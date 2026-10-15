@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button, Input, Menu, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
-import { HEADER_CHEVRONS, SELECTOR_ICON } from '../icons.ts'
+import { HEADER_CHEVRONS, RESULT_ICONS, SELECTOR_ICON } from '../icons.ts'
 import css from './fields.module.css'
 
 /** 一个配置分组的属性。展开状态由调用方持有。 */
@@ -234,8 +234,9 @@ export interface SourceStatus {
 /**
  * 右槽的**临时**内容：正在测、或刚测完。
  *
- * 它借用「身份」那个槽，所以出现与消失都**不改变行高** —— 从前把测试结果单开一行，
- * 一按就顶起高度、中间留一片空白，还会一直留着。
+ * 它出现在**凭据身份左侧**，几秒后自己消失 —— 身份**从头到尾都在**，
+ * 不会被它顶掉。替换身份会让那一格闪一下，那正是要避免的突兀。
+ * 因为与身份同处一行、都不换行，出现与消失也**不改变行高**。
  */
 export type SourceLive =
   | { readonly kind: 'busy' }
@@ -261,28 +262,17 @@ export interface SourceRowProps {
  * 行首是一盏灯（或账号那行的头像），行名后面**紧跟**凭据身份，第二行才写来历。
  * 灯 8×8 逐值抄官方 `ui-settings-models` 的 `.credentialDot`。
  *
- * 右槽是整行唯一会变的地方，且**永远不换行**（`nowrap` + 省略号）：测试结果长短不一，
- * 一旦让它换行，行高就会在按下去的一瞬间跳一下 —— 那正是本轮要消掉的东西。
+ * **右槽是「临时内容 + 凭据身份」，不是「临时内容或身份」**：身份常驻，
+ * 测试的转圈与结果排在它**左边**，几秒后自行消失。替换身份会让那一格闪一下。
+ * 整槽**永远不换行**（`nowrap` + 省略号）：结果长短不一，一旦换行，行高就会在
+ * 按下去的一瞬间跳一下。
  * @param props - 名称、状态、临时内容与可选的行首元素。
  * @returns 状态行元素。
  */
 export function SourceRow(props: SourceRowProps) {
   const live = props.live ?? null
-  let slot: ReactNode = null
-  let slotRole: 'status' | 'alert' | undefined
-  if (live !== null && live.kind === 'busy') {
-    // 官方原语的转圈：`ongoing` 是它唯一带运动的档。测试中那几行的「动画」就是它。
-    slot = <StateDot state="ongoing" size={14} />
-  } else if (live !== null) {
-    slot = (
-      <span className={css.sourceLive} title={live.text}>
-        {live.text}
-      </span>
-    )
-    // 成功只是通报（polite）；失败要用户处理（assertive）。**不用颜色**，所以不成败靠字。
-    slotRole = live.ok ? 'status' : 'alert'
-  } else if (props.status.identity !== '') {
-    slot = (
+  const identity =
+    props.status.identity === '' ? null : (
       <span
         className={clsx(css.sourceIdentity, props.monoIdentity === true && css.sourceIdentityMono)}
         title={props.status.identity}
@@ -290,7 +280,6 @@ export function SourceRow(props: SourceRowProps) {
         {props.status.identity}
       </span>
     )
-  }
   return (
     <div className={css.source}>
       <div className={css.sourceHead}>
@@ -303,8 +292,31 @@ export function SourceRow(props: SourceRowProps) {
           props.leading
         )}
         <span className={css.sourceName}>{props.label}</span>
-        <span className={css.sourceSlot} role={slotRole}>
-          {slot}
+        <span className={css.sourceSlot}>
+          {live === null ? null : (
+            // 成功只是通报（polite）；失败要用户处理（assertive）。**不上色**，成败靠图标形状。
+            <span
+              className={css.sourceLive}
+              role={live.kind === 'busy' ? undefined : live.ok ? 'status' : 'alert'}
+            >
+              {live.kind === 'busy' ? (
+                // 官方原语的转圈：`ongoing` 是它唯一带运动的档。
+                <StateDot state="ongoing" size={14} />
+              ) : (
+                <>
+                  {live.ok ? (
+                    <RESULT_ICONS.ok className={css.sourceLiveIcon} />
+                  ) : (
+                    <RESULT_ICONS.fail className={css.sourceLiveIcon} />
+                  )}
+                  <span className={css.sourceLiveText} title={live.text}>
+                    {live.text}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
+          {identity}
         </span>
       </div>
       {props.status.detail === '' ? null : (

@@ -94,14 +94,15 @@ export const zh = {
   // 账号那条唯一需要说出来的一句：那是**部署事实**，用户做什么都没用；
   // 而整行留空会被读成「插件坏了」。未登录不说 —— 它是正常状态。
   'settings.sources.accountNoService': '本部署没有账号服务，这条途径不可用。',
-  // 测试。结果借每行右槽显示 4 秒，所以文案要短；✓ / ✗ 让成败在余光里也分得开
-  // （**不用颜色**是维护者定的）。
-  'settings.test': '测试两条途径',
+  // 测试。结果借每行右槽显示 4 秒（排在凭据身份**左边**，所以身份不会被顶掉），
+  // 所以文案要短。成败由**官方那对圆圈图标**表达（check-circle / close-circle），
+  // 不用 `✓` / `✗` 字符：字符的基线、字重、间距都跟着字体走，与旁边那行等宽掩码并排会歪。
+  'settings.test': '测试',
   'settings.testing': '正在测试…',
-  'settings.test.ok': '✓ 连接正常 · {ms}ms',
-  'settings.test.noKey': '✗ 没有可用凭据',
-  'settings.test.notSignedIn': '✗ 尚未登录',
-  'settings.test.fail': '✗ 连接失败：{message}',
+  'settings.test.ok': '{ms}ms',
+  'settings.test.noKey': '没有可用凭据',
+  'settings.test.notSignedIn': '尚未登录',
+  'settings.test.fail': '连接失败：{message}',
 
   'settings.hint.displayCurrency': '所选币种不存在时，回落到账户实际持有的币种。',
   'settings.hint.threshold': '后端判定；界面颜色跟随返回的严重度。',
@@ -192,12 +193,12 @@ export const en: Record<LocaleKey, string> = {
   'settings.sources.sourceUnknown': 'Source unconfirmed',
   'settings.sources.accountNoService':
     'This deployment ships no account service, so this source is unavailable.',
-  'settings.test': 'Test both sources',
+  'settings.test': 'Test',
   'settings.testing': 'Testing…',
-  'settings.test.ok': '✓ Connection looks good · {ms}ms',
-  'settings.test.noKey': '✗ No credential available',
-  'settings.test.notSignedIn': '✗ Not signed in',
-  'settings.test.fail': '✗ Connection failed: {message}',
+  'settings.test.ok': '{ms}ms',
+  'settings.test.noKey': 'No credential available',
+  'settings.test.notSignedIn': 'Not signed in',
+  'settings.test.fail': 'Connection failed: {message}',
 
   'settings.hint.displayCurrency': 'Falls back to a currency the account actually holds.',
   'settings.hint.threshold': 'Decided on the server; the UI colour follows the returned severity.',

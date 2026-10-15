@@ -316,7 +316,7 @@ function readAccountSource(value: unknown): AccountSourceInfo {
  * 读一次两条途径的状态。
  *
  * `refresh` 为真时让后端强制重读（绕过它的缓存）—— 卡片打开、窗口重新获得焦点、
- * 点「测试两条途径」时都用它。这正是修掉「在官方页换了 key，这里还显示旧的那把」的那一环。
+ * 点 **Test** 时都用它。这正是修掉「在官方页换了 key，这里还显示旧的那把」的那一环。
  * @param options - 是否强制重读，以及可注入的 fetch。
  * @returns 两条途径的状态；形状不对时退化成保守快照。
  * @throws 端点不可达、非 2xx 或响应不是 JSON。

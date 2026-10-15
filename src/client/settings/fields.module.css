@@ -185,8 +185,8 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* 右槽：身份与测试结果共用它。
-   `justify-content: flex-end` 把它推到行尾；`min-width: 0` + 子项的省略号
+/* 右槽：**临时内容 + 凭据身份**并排，身份常驻、临时内容排在它左边。
+   `justify-content: flex-end` 把这一串推到行尾；`min-width: 0` + 子项的省略号
    保证它**永不换行** —— 测试结果长短不一，一旦换行，按下去的那一瞬行高就会跳。 */
 .sourceSlot {
   flex: 1 1 auto;
@@ -194,10 +194,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
 }
 
 .sourceIdentity,
-.sourceLive {
+.sourceLiveText {
   min-width: 0;
   font-size: 12px;
   line-height: 1.5;
@@ -210,6 +211,22 @@
 /* 掩码 key 是标识符，用等宽；账号名是人名，不用。 */
 .sourceIdentityMono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 临时区（转圈 / 成败图标 + 那句话）。
+   它自己 `flex: 0 1 auto` 可收缩，所以窄卡片上先挤它、不动身份 ——
+   身份是稳定事实，临时内容看完就没。 */
+.sourceLive {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 成败图标不参与换行，也不跟着文字一起被压扁。 */
+.sourceLiveIcon {
+  flex: none;
 }
 
 /* 第二行：凭据是从哪一层取到的（或脱敏联系方式）。是一句话，不是标识符栏，
@@ -467,7 +484,7 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-/* 动作行（测试两条途径）。转圈与按钮同排，所以按钮不会因为多了个转圈而跳位。 */
+/* 动作行（Test 按钮）。 */
 .actions {
   display: flex;
   align-items: center;

@@ -342,7 +342,7 @@ export async function handleConfigUpdate(request: Request, deps: HttpDeps): Prom
  * - `source: 'deepseek-account'`：走账号那条路真读一次钱包。
  *
  * **真连一次上游**，回真实的 `latencyMs`。这正是它存在的意义 ——
- * 界面上的「测试两条途径」按钮读的就是这里，而不是本地字符串检查。
+ * 界面上的 **Test** 按钮读的就是这里，而不是本地字符串检查。
  *
  * **余额预览不在这里**：卡片按 [settings/AGENTS.md](../client/settings/AGENTS.md)
  * 不许出现任何额度信息，所以账号那条只回成败与延迟，不回钱包内容。

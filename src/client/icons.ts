@@ -21,8 +21,10 @@
 
 import type { ComponentType } from 'react'
 import {
+  IconCheckOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular,
+  IconCloseOutlineRegular,
   IconLinkOutlineRegular,
   IconPluginPinwheelOutlineRegular,
   IconRefreshOutlineRegular,
@@ -55,6 +57,24 @@ export const GROUP_ICONS = {
 
 /** 分组键，与 `BalanceSettingsCard` 的分组顺序一致。 */
 export type GroupIconKey = keyof typeof GROUP_ICONS
+
+/**
+ * 测试结果的成败图标。
+ *
+ * **用图形而不是 `✓` / `✗` 字符**：字符的基线、字重、间距都跟着字体走，
+ * 与旁边那行等宽掩码并排时会歪，粗细也完全不受我们控制。
+ * 用官方那一对**同族的纯字形**（对勾 / 叉）：形状本身就说清了成与败，
+ * 所以不需要颜色去补（测试结果**不上色**）。取 `Regular` 档，与配置页其余图标同档。
+ *
+ * **这一对的选择被「声明下限」约束过**：更顺眼的 `IconCloseCircleOutlineRegular`
+ * （带圆圈的叉）在宿主更新的一档里才有，**本仓声明的那一档没有**
+ * （那一档只有 `IconCloseCircleFillRegular`，与对勾的 outline 不是一个画风）。
+ * 引官方符号前先在声明下限那一档确认它存在 —— 这条规则就是这么生效的。
+ */
+export const RESULT_ICONS = {
+  ok: IconCheckOutlineRegular,
+  fail: IconCloseOutlineRegular,
+} as const satisfies Record<string, AppIcon>
 
 /**
  * 分组折叠头的两个箭头。
