@@ -85,7 +85,7 @@
     "@deepseek-ai/dsh-home-paths": "^0.1.7-rc.1 || ^0.2.1-rc.1",
     "@deepseek-ai/dsh-settings": "^0.1.7-rc.1 || ^0.2.1-rc.1",
     "@deepseek-ai/dsh-storage-domain": "^0.1.7-rc.1 || ^0.2.1-rc.1",
-    "@deepseek-ai/schemastery": "^3.18.3",
+    "@deepseek-ai/schemastery": "^3.18.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -105,7 +105,7 @@
     "@deepseek-ai/dsh-home-paths": "^0.1.7-rc.1 || ^0.2.1-rc.1",
     "@deepseek-ai/dsh-settings": "^0.1.7-rc.1 || ^0.2.1-rc.1",
     "@deepseek-ai/dsh-storage-domain": "^0.1.7-rc.1 || ^0.2.1-rc.1",
-    "@deepseek-ai/schemastery": "^3.18.3",
+    "@deepseek-ai/schemastery": "^3.18.5",
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
     "@types/react": "~18.3.1",
