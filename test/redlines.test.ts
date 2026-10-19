@@ -764,7 +764,14 @@ describe('设置接缝', () => {
       .filter((t): t is string => t !== undefined)
     expect(families, 'engines.dsh 读不出任何族').toHaveLength(2)
     expect(families).toContain('0.1.7')
-    expect(families).toContain('0.2.0')
+    // 第二族的**元组**不写死：宿主每往前推一个补丁位的预发布，就得手工把它抬一次
+    // （npm 只匹配同一 major.minor.patch 且带预发布段的比较子）。写死元组会让每轮换线都要改测试，
+    // 而这条红线要守的是「别把第二族悄悄删掉」。元组本身由「逐字相同」那条与
+    // [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的换线流程一起守。
+    expect(
+      families.filter((tuple) => tuple !== '0.1.7'),
+      'engines.dsh 的第二族不见了（只剩 0.1.7）',
+    ).toHaveLength(1)
   })
 })
 
