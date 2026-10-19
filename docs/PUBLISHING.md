@@ -311,7 +311,8 @@ compat 巡检红了怎么办：
 判据：覆盖不到就是红；被跟的那条线由 [README.md](../README.md) 的「版本兼容」一节点名。
 
 声明是**窄**的：每一族的下限是**我们实测过的那一版**，写成 `>=<下限>`，**不设上限**。
-- 声明面是**若干个族（`||`）的并集**（2026-10-19 起三族：`0.1.7-rc` + `0.2.0-rc` + `0.2.1-rc`）。
+- 声明面是**若干个族（`||`）的并集**（2026-10-19 起三族：两个旧 RC 族 + 当前承诺线，具体区间见
+  [package.json](../package.json) 的 `engines.dsh`，本文不抄值）。
   要同时承诺多族，单区间**罩不住** —— npm 只在同一 `major.minor.patch` 的预发布之间匹配，
   所以必须显式枚举成并集。**每加一族就必须在 [compat.yml](../.github/workflows/compat.yml) 的矩阵里加一条腿，
   并在 [scripts/check-declaration.mjs](../scripts/check-declaration.mjs) 的目标线里加一条** ——
