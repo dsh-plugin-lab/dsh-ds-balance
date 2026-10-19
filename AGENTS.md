@@ -36,7 +36,7 @@
 - 颜色只由后端 `severity` 决定；前端读阈值的唯一去处是圆环弧长，且只读 `warn`、只当刻度
 - 样式只用 CSS Modules + `--dsw-alias-*`；禁 Tailwind、禁组件库、禁字面色值
 - **所有 `@deepseek-ai/dsh-*` 声明与 `engines.dsh` 逐字相同**（同形状、同区间、逐字符）。两份声明自相矛盾时，使用者按我们给的区间装不出可用的宿主。抬过三批：2026-09-20（peer 8 条 + 仅 dev 的 2 条）、本次接缝迁移（12 条受管包 + `engines.dsh` 一起改）、2026-10-10（加回旧 RC 族改成两族并集，23 条 + `engines.dsh` 一起改），分别见[决策记录](.agents/notes/2026-09-20-declaration-floor-alignment.md)、[本轮记录](.agents/notes/2026-09-22-settings-seam-migration.md)与[两族那条](.agents/notes/2026-10-10-two-families-declared.md)。红线在 [test/redlines.test.ts](test/redlines.test.ts)。
-- **声明面是若干个族（`||`）的并集**：要同时承诺两族（RC 族与仍可用的旧 RC 族），npm 的预发布语义下单区间罩不住（预发布候选只与「同 `major.minor.patch` 且也带预发布段」的比较子匹配）。换版语义随之是「**保留旧族、只替换目标族**」；巡检矩阵 = **声明面承诺哪些族就测哪些族**（承诺一族 = 声明面加一族 + [compat.yml](.github/workflows/compat.yml) 矩阵加一行；宿主发新族**不**自动进矩阵，是否加承诺人工决定）。
+- **声明面是若干个族（`||`）的并集**：2026-10-19 起承诺三族（具体区间见 `package.json` 的 `engines.dsh`，本文件不抄值），npm 的预发布语义下单区间罩不住（预发布候选只与「同 `major.minor.patch` 且也带预发布段」的比较子匹配）。**加一族要同批改三处**：声明面、[compat.yml](.github/workflows/compat.yml) 矩阵、[scripts/check-declaration.mjs](scripts/check-declaration.mjs) 的目标线 —— 漏最后一处就是「声明了却没验」。换版语义随之是「**保留旧族、只替换目标族**」；巡检矩阵 = **声明面承诺哪些族就测哪些族**（承诺一族 = 声明面加一族 + [compat.yml](.github/workflows/compat.yml) 矩阵加一行；宿主发新族**不**自动进矩阵，是否加承诺人工决定）。
 - **依赖写在 peer 还是 dev，判据是「我们与它的关系」，不是它住在哪一侧** —— 两类，缺一类就会出事：
   - **只做类型面（module augmentation）、我们不消费它提供的服务** → 只写 `devDependencies`。目前是
     `@deepseek-ai/dsh-client-ui-plugin-manager`（模块增强）与 `@deepseek-ai/cordis-plugin-loader`（`loader/volatile-update` 的事件键声明）。

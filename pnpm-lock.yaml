@@ -19,43 +19,43 @@ importers:
         specifier: ^1.0.4
         version: 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.9)
       '@deepseek-ai/dsh-client-connection':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-client-locale':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-plugin-manager':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-primitives':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-renderer':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-settings':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-sidebar':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-slots':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-credentials':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-deepseek-account-platform':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-authorization@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-credentials@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-credentials@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-deepseek-account@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-util-values@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-host-webserver@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-home-paths':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-settings':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis-plugin-include@1.0.10)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-app-boot@0.2.1-rc.2(@deepseek-ai/cordis-plugin-group@1.0.5(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.10)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-brand@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/schemastery@3.18.5)(node-addon-require-builtin@0.1.9)
       '@deepseek-ai/dsh-storage-domain':
-        specifier: ^0.1.7-rc.1 || ^0.2.1-rc.1
+        specifier: ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-rc.1
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/schemastery':
         specifier: ^3.18.5
@@ -1516,9 +1516,6 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
-
 snapshots:
 
   '@cacheable/memory@2.2.0':
@@ -1759,7 +1756,7 @@ snapshots:
     dependencies:
       '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.10)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh-brand': 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
-      zod: 4.6.5
+      zod: 4.4.3
 
   '@deepseek-ai/dsh-util-crypto@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)':
     dependencies:
@@ -2742,5 +2739,3 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   zod@4.4.3: {}
-
-  zod@4.6.5: {}
