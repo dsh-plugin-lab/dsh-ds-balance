@@ -145,13 +145,15 @@
 
 ## 活跃坑
 
-- **`zod` 必须与宿主钉成同一个精确版本**（2026-10-19 巡检实红）：`@deepseek-ai/dsh-storage-domain` 在
-  `0.2.1-rc.2` 上把 `zod` 从 `^4.4.3` 收紧成**精确的 `4.4.3`**，而本仓 `dependencies` 写的是 `^4.6.5`
-  → 装出两份 zod（`zod@4.4.3` 与 `zod@4.6.7`），类型互不兼容，`typecheck` 报
-  「`ZodType<...>` 不能赋给 `ZodType<...>` 而两条路径都是 `.pnpm/zod@...`」。所以本仓 `zod` 写**精确版**
-  （= 宿主那一份），**不是** `^` 区间：`^4.4.3` 会解析回 4.6.x，双份立刻回来。
-  代价写在明处：**宿主下一次抬 zod 时，本仓必须同批改这一个精确版**，否则静默回到两份 —— 判据是
-  换线后 `typecheck` 报错里出现两个 `.pnpm/zod@<不同版本>`。同理见上面那条「宿主版本可能与 devDeps 错位」。
+- **`zod` 必须与宿主钉成同一个精确版本**（2026-10-19 巡检实红）：`@deepseek-ai/dsh-storage-domain`
+  在宿主当前线上把 `zod` 从 `^4.4.3` 收紧成**精确的 `4.4.3`**（同一 release 里另一个包又钉了更高的
+  精确版，上游自己就有两份），而本仓 `dependencies` 当时写的是 `^4.6.5` —— 装出两份 zod，类型互不兼容，
+  `typecheck` 报「`ZodType<...>` 不能赋给 `ZodType<...>` 而两条路径都是 `.pnpm/zod@<不同版本>`」。
+  所以本仓 `zod` 写**精确版**（= 宿主 storage-domain 那一份），**不是** `^` 区间：
+  写 `^4.4.3` 会解析回更高的 4.6.x，双份立刻回来。
+  判据：换线后 `typecheck` 报错里出现两个 `.pnpm/zod@<不同版本>`。
+  代价写在明处：**宿主下一次抬 zod 时本仓必须同批改这一个精确版**，否则静默回到两份 ——
+  同型见下一条「宿主版本可能与 devDeps 错位」。
 - **宿主版本可能与 devDeps 错位**：本仓 devDeps 锁在某个宿主编译，实际运行的宿主可能更新。改代码前先跑 `dsh --version` 对比 `package.json` 的 devDeps；错位可能导致编译通过但运行时崩。升级 devDeps 要同步决定 `engines.dsh` 的兼容范围。连带一条：宿主线升级时**宿主包的传递依赖也可能被抬** —— 本仓若把它写死在旧版，包管理器会装出**两份同名包**，类型互不兼容 → 编译报「A 不能赋给 B」而两个路径都是 `node_modules`。判据：报错里出现两个不同层级的 `node_modules`；处置：把本仓那份升到与宿主同源的范围。核验兼容性用**仓库外**的临时目录装目标线宿主包。在仓内建目录的代价是双份的：包管理器把它当 workspace 成员，`add` 会顺带重排本仓 `node_modules`，并往锁文件写一条 **importer** 记录 —— 目录删了记录还在，而**本机安装不带 frozen 校验会静默自愈**，只有 CI 的 frozen 模式才判红（姊妹仓 2026-10-02 三平台齐红，失败在第一步 install）。判据：在锁文件里搜那个目录名；处置：重新解析，别手工编辑锁文件。
 - **`sidebar.footer.action` 的宿主容器是 row flex（宿主遗漏）**：官方 cordis 面板（`packages/extensions/ui-cordis/src/client/`）把根节点写成满宽且不收缩，横排下条目会被挤到 0 宽。我们已用 `:has()` 反选父元素把它改回纵向堆叠 → [决策](.agents/notes/2026-09-17-footer-stack-override.md)。依赖 `:has()` 与该锚点属性稳定。
 - **`dsh plugin` 会把声明了 `dsh.bundle` 的已装包写进 profile 的 `dsh.profile.bundles`**，而 bundle 层与 patch 层的 insert 行**只在启动时读** —— 两条同时存在就是**双挂载**。开发期靠「不声明 `dsh.bundle`」躲开它，发布态不能这么干（包里必须有 bundle 层）。所以装法只能选一种：**`dsh plugin add` 或手写 patch 行，不要都做**。改本机 profile 前先看 `dsh.profile.bundles`。
