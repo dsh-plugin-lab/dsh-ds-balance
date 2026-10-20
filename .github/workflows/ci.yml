@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # pnpm 必须在 setup-node **之前**装好，否则 `cache: pnpm` 找不到 store。
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
