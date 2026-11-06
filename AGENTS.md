@@ -100,6 +100,15 @@
 - [x] `test/` 目录与双件
 - [x] `LICENSE` 文件（MIT）并加进 `package.json` 的 `files`
 - [x] 文档同步与提交
+- [ ] **`zod` 停在 4.4.3 是被上游挡住的，不是忘了升**（2026-11-06 记）：
+  4.6.6 是 GHSA-mrhx-c7xc-m3w5（CVE-2023-54404，high）的修复版 —— zod < 4.6.6 在
+  **无长度约束的数组校验**上可被撑爆内存。但宿主当前线上**每一个** `@deepseek-ai/dsh-*` 包
+  仍钉着精确的 `4.4.3`（含作为 peer 的 `dsh-storage-domain`），升上去就是两份 zod →
+  `typecheck` 报 TS2345，dependabot PR（#40）因此关闭。安全告警 #17 / #18 **刻意留 open**，
+  它是这条待办的信号。**解除条件**：宿主抬 zod 时同批改这一个精确版（见「活跃坑」第一条）；
+  宿主那一份现查 `node scripts/compat-swap.mjs check` 或读宿主包的清单，不抄进本文。
+  届时顺带评估：`storedSnapshotSchema` 的 `balances` 正是「无长度约束的数组」那个形状，
+  给它加 `.max()` 能从数据侧消掉这条路径 —— 但那是改域 schema，要按 Q 表定档再发版。
 - [ ] 六条待产品决策的默认值 → [决策记录](.agents/notes/2026-09-17-implementation-deviations.md) 末节
 - [x] 重启宿主一次让后端半边生效（维护者已做，13:15）
 - [x] 本轮 UI 改动的收尾：文档同步、报告回填、提交
