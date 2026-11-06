@@ -5,6 +5,11 @@
  * 判据：**声明的区间必须能覆盖我们告诉用户去装的那条线**（README 的「版本兼容」章节点名的那条
  * dist-tag 线，本文件用 TRACKED_LINE 记着）。覆盖不到就是红。
  *
+ * 除了受管面（`@deepseek-ai/dsh-*`），本脚本还判一条**共用依赖**：本仓钉成精确版的那个包，
+ * 必须仍落在宿主声明的那一份里 —— 见 SHARED_PINS。它不在受管面内，主判据看不见它；
+ * 而它一旦错位就是「装出两份、类型互不兼容」，报错信息只指着两份 `.pnpm/<包>@<版本>`，
+ * 不指着该改哪一行。判在这里，红的时候就能直接说出该把它改成什么。
+ *
  * 为什么单独成一步：它只读文件与 registry，几十秒出结果；与「换到那条线上还构不构得出来」
  * 是两件事，混在一起会互相遮蔽。所以本脚本**不装任何依赖**，只问 npm。
  *
@@ -67,6 +72,24 @@ const MANIFEST_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies']
 /** 用于上下文对照的三条线。 */
 const LINES = ['alpha', 'next', 'latest']
 
+/**
+ * 共用依赖：本仓把它的精确版钉死，而宿主那边也声明了同一个包 —— 两边必须是**同一份**。
+ *
+ * 判据是「本仓的精确版**满足**宿主声明的那份范围」，不是「两处字符串相等」：
+ * 宿主在不同族上写法不同（有的写 `^` 区间、有的写精确版），字符串比会假红。
+ * 之所以要求满足而不是「随便满足就行」：本仓钉的是**精确版**，包管理器会把它解析成
+ * 恰好那一个；宿主声明若已经越过它，两边就会各装一份。
+ *
+ * 为什么只有这一条：`via` 指的是**我们把对象交给它**的那个宿主包 ——
+ * `src/adapters/domain-core-store.ts` 把本仓的 schema 传给它的 `domainTable()`，
+ * 跨过这条边界的值必须来自同一个实例。宿主其它包内部有几份 zod 是上游自己的事。
+ *
+ * 加新条目要先问：我们是否把该类型的值交给了宿主？是才加。
+ *
+ * @type {{ name: string, via: string }[]}
+ */
+export const SHARED_PINS = [{ name: 'zod', via: '@deepseek-ai/dsh-storage-domain' }]
+
 const USAGE = `usage:
   node scripts/check-declaration.mjs                 # judge every declared line (${TRACKED_LINES.map((target) => target.line).join(' / ')})
   node scripts/check-declaration.mjs --line next     # judge one dist-tag line only
@@ -74,6 +97,12 @@ const USAGE = `usage:
 exit codes: 0 = every declared range covers every target line / 1 = it does not / 2 = usage or precondition error`
 
 const tagsCache = new Map()
+
+/** packument 缓存：同一个包在一次运行里只读一遍 registry。 */
+const packuments = new Map()
+
+/** 某个包的版本号清单缓存（由 packument 派生）。 */
+const versionsCache = new Map()
 
 /**
  * 找 npm 的 CLI 入口，直接用当前 node 跑它。
@@ -162,18 +191,29 @@ function declarations(manifest) {
 }
 
 /**
+ * 从 registry 读一个包的完整 packument（缩写格式，已够用：每个版本都带 `dependencies`）。
+ * @param name - 包名。
+ * @returns packument。
+ */
+async function packument(name) {
+  if (packuments.has(name)) return packuments.get(name)
+  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
+    headers: { accept: 'application/vnd.npm.install-v1+json' },
+  })
+  if (!response.ok) throw new Error(`registry answered ${response.status} for ${name}`)
+  const body = await response.json()
+  packuments.set(name, body)
+  return body
+}
+
+/**
  * 从 registry 读一个包的全部已发布版本（用来按**版本前缀**定位一族）。
  * @param name - 包名。
  * @returns 版本号列表。
  */
 async function publishedVersions(name) {
   if (versionsCache.has(name)) return versionsCache.get(name)
-  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
-    headers: { accept: 'application/vnd.npm.install-v1+json' },
-  })
-  if (!response.ok) throw new Error(`registry answered ${response.status} for ${name}`)
-  const body = await response.json()
-  const versions = Object.keys(body.versions ?? {})
+  const versions = Object.keys((await packument(name)).versions ?? {})
   versionsCache.set(name, versions)
   return versions
 }
@@ -197,6 +237,60 @@ async function resolveTargetVersion(name, target) {
   if (matching.length === 0)
     throw new Error(`${name} has no published version starting with ${target.line}`)
   return matching[matching.length - 1]
+}
+
+/**
+ * 判共用依赖：本仓钉的精确版，必须仍落在宿主在每条目标线上声明的那份范围里。
+ *
+ * 红的时候要直接说出该改成什么 —— 这条检查存在的全部理由，就是别让人再从
+ * 「两份 `.pnpm/<包>@<版本>`、TS2345」里反推该动哪一行。
+ *
+ * @param manifest - 解析后的 package.json。
+ * @param targets - 要判的目标线。
+ * @returns 失败记录（供退出码汇总）；空数组表示全部成立。
+ */
+async function checkSharedPins(manifest, targets) {
+  const failures = []
+  for (const pin of SHARED_PINS) {
+    const ours = manifest.dependencies?.[pin.name] ?? manifest.peerDependencies?.[pin.name]
+    if (typeof ours !== 'string') {
+      throw new Error(`package.json does not declare ${pin.name}, which SHARED_PINS expects`)
+    }
+    console.log(`[INFO] shared pin: ${pin.name}=${ours} must stay satisfiable by ${pin.via}`)
+
+    for (const target of targets) {
+      const hostVersion = await resolveTargetVersion(pin.via, target)
+      const declared = (await packument(pin.via)).versions?.[hostVersion]?.dependencies?.[pin.name]
+
+      // 宿主不再声明它 → 那条边界没了，这个判据失去对象。是前置条件变化，不是「罩不住」。
+      if (typeof declared !== 'string') {
+        throw new Error(
+          `${pin.via}@${hostVersion} no longer declares ${pin.name}; SHARED_PINS needs revisiting`,
+        )
+      }
+
+      const matches = matchingVersions(pin.name, declared)
+      if (matches.includes(ours)) {
+        console.log(
+          `[NOTE] ${pin.name}=${ours} satisfies ${pin.via}@${hostVersion} (${declared}) on ${target.line}`,
+        )
+        continue
+      }
+
+      const suggestion = matches[matches.length - 1]
+      console.log(
+        `[WARN] ${pin.name}=${ours} is OUTSIDE ${pin.via}@${hostVersion}'s ${declared} (${target.line})` +
+          (suggestion === undefined
+            ? ' — that range matches no published version'
+            : ` — set dependencies.${pin.name} to ${suggestion}`),
+      )
+      failures.push({
+        target: target.line,
+        sharedPins: [{ pin, hostVersion, declared, suggestion }],
+      })
+    }
+  }
+  return failures
 }
 
 /**
@@ -242,6 +336,8 @@ async function check(only) {
     if (uncovered.length > 0) failures.push({ target: target.line, uncovered })
   }
 
+  failures.push(...(await checkSharedPins(manifest, targets)))
+
   // 判据落在被跟的线上，而不是 `latest`：宿主 `latest` 指向的版本比被跟的线还旧
   // （README 的安装一节因此要求显式点名版本线）。
   const hostTags = await distTags(HOST_PACKAGE)
@@ -254,17 +350,28 @@ async function check(only) {
 
   if (failures.length === 0) {
     console.log(
-      `[NOTE] declaration check passed: all ${decls.length} declared ranges cover every target line (${targets.map((target) => target.line).join(', ')})`,
+      `[NOTE] declaration check passed: all ${decls.length} declared ranges cover every target line (${targets.map((target) => target.line).join(', ')}), and every shared pin stays satisfiable`,
     )
     return 0
   }
   for (const failure of failures) {
+    // 两种失败共用一个退出码，但说法不同：一种是我们的区间罩不住那条线，
+    // 另一种是宿主把共用依赖抬走了、我们钉的那个精确版已经落在外面。
+    if (failure.sharedPins) {
+      for (const { pin, hostVersion, declared, suggestion } of failure.sharedPins) {
+        console.log(
+          `[WARN] declaration check failed: ${pin.name} is pinned to a version ${pin.via}@${hostVersion} no longer accepts (${declared}) on the ${failure.target} line` +
+            (suggestion === undefined ? '' : ` — set dependencies.${pin.name} to ${suggestion}`),
+        )
+      }
+      continue
+    }
     console.log(
       `[WARN] declaration check failed: ${failure.uncovered.length} of ${decls.length} declared ranges do not cover the ${failure.target} line`,
     )
   }
   console.log(
-    '[NOTE] update the declared ranges in package.json to a version you actually tested, or move the tracked line.',
+    '[NOTE] update package.json to what the tracked lines actually serve, or move the tracked line.',
   )
   return 1
 }
@@ -274,8 +381,6 @@ function usageError(message) {
   console.error(USAGE)
   process.exit(2)
 }
-
-const versionsCache = new Map()
 
 /**
  * 解析 `--line`：省略时返回 `undefined`（判全部目标线）。
