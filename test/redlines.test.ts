@@ -740,7 +740,7 @@ describe('设置接缝', () => {
     expect([...ranges]).toEqual([pkg.engines?.dsh])
   })
 
-  it('engines.dsh 同时承诺两族（|| 并集），删掉一族等于缩窄对外承诺', () => {
+  it('engines.dsh 承诺 0.1.7 与全部 RC 族（|| 并集），删掉一族等于缩窄对外承诺', () => {
     // 0.1.7 那族是**真实兼容修复**：有使用者停在 0.1.7 族宿主上，2026-10-01 换线时下限被抬到
     // RC 族起点，把他们判成了不兼容。删掉这一族会让那批使用者再次装不上，且没有任何别处会红。
     //
@@ -762,7 +762,7 @@ describe('设置接缝', () => {
       .split('||')
       .map((branch) => /(\d+)\.(\d+)\.(\d+)/.exec(branch)?.[0])
       .filter((t): t is string => t !== undefined)
-    expect(families, 'engines.dsh 读不出任何族').toHaveLength(3)
+    expect(families, 'engines.dsh 读不出四族').toHaveLength(4)
     expect(families).toContain('0.1.7')
     // 第二、三族的**元组**不写死：宿主每往前推一个补丁位的预发布，就得手工把它抬一次
     // （npm 只匹配同一 major.minor.patch 且带预发布段的比较子）。写死元组会让每轮换线都要改测试，
@@ -770,8 +770,8 @@ describe('设置接缝', () => {
     // [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的换线流程一起守。
     expect(
       families.filter((tuple) => tuple !== '0.1.7'),
-      'engines.dsh 承诺的 RC 族不足两族（0.2.0 / 0.2.1 都得在）',
-    ).toHaveLength(2)
+      'engines.dsh 承诺的 RC 族不足三族（0.2.0 / 0.2.1 / 0.2.2 都得在）',
+    ).toHaveLength(3)
   })
 })
 
