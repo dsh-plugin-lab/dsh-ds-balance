@@ -57,7 +57,9 @@
 - `pnpm run typecheck`、`pnpm test`
 - `pnpm run test:contract`：打真实上游的契约测试，要环境里有 `DSH_CI_API_KEY`（专用），缺了回落 `DEEPSEEK_API_KEY`；不进 ci.yml
 - `pnpm run check:release`：发布态不变量；当前 **0 失败**（`dsh.bundle.patch`、`private`、展示面的 `exports` / `files` 覆盖与 icon 那几条都已就位）
-- `pnpm run check:declaration`：声明面 —— 只读 `package.json` 的区间 + 问 npm，判「声明的范围还罩不罩得住被跟的那条线」；**不装依赖**，几十秒出结果
+- `pnpm run check:declaration`：声明面 —— 只读 `package.json` 的区间 + 问 npm，判两件事：
+  ①「声明的范围还罩不罩得住被跟的那条线」；②`SHARED_PINS` 里那些**钉成精确版的共用依赖**
+  还满不满足宿主声明的那一份（红时直接打印该改成哪个版本）。**不装依赖**，几十秒出结果。
 - `node scripts/acceptance.mjs`（端到端验收）、`node scripts/compat-swap.mjs check`（现查三条 dist-tag 线）
 - 挂载：`dsh plugin --profile <profile> add <包名或仓库路径>`，然后**重启宿主**。包内声明了 `dsh.bundle.patch`，安装器会把它写进该 profile 的 `dsh.profile.bundles` —— bundle 层只在启动时读。
 - **不要再往 profile 的 `cordis.patch.yml` 手写 insert 行**：那是本插件还没声明 `dsh.bundle` 时的开发期做法，现在两者并存就是双挂载（见活跃坑）。
@@ -96,38 +98,24 @@
 
 ## 待办
 
-- [x] 首次 commit（工程骨架 / 文档网络 / UI 实现三个）
-- [x] `test/` 目录与双件
-- [x] `LICENSE` 文件（MIT）并加进 `package.json` 的 `files`
-- [x] 文档同步与提交
-- [ ] **`zod` 停在 4.4.3 是被上游挡住的，不是忘了升**（2026-11-06 记）：
-  4.6.6 是 GHSA-mrhx-c7xc-m3w5（CVE-2023-54404，high）的修复版 —— zod < 4.6.6 在
-  **无长度约束的数组校验**上可被撑爆内存。但宿主当前线上**每一个** `@deepseek-ai/dsh-*` 包
-  仍钉着精确的 `4.4.3`（含作为 peer 的 `dsh-storage-domain`），升上去就是两份 zod →
-  `typecheck` 报 TS2345，dependabot PR（#40）因此关闭。安全告警 #17 / #18 **刻意留 open**，
-  它是这条待办的信号。**解除条件**：宿主抬 zod 时同批改这一个精确版（见「活跃坑」第一条）；
-  宿主那一份现查 `node scripts/compat-swap.mjs check` 或读宿主包的清单，不抄进本文。
-  届时顺带评估：`storedSnapshotSchema` 的 `balances` 正是「无长度约束的数组」那个形状，
-  给它加 `.max()` 能从数据侧消掉这条路径 —— 但那是改域 schema，要按 Q 表定档再发版。
+**只留还开着的。** 答完的当场删掉，结论归位到它该去的地方（笔记 / `docs/ARCHITECTURE.md` / 断言），
+不在这里留「已完成」清单 —— 一份长到没人逐行读的清单，等于任何新条目都没被记下。
+
+- [ ] **`storedSnapshotSchema.balances` 要不要加长度上限**（未决策）——
+  它是「无长度约束的数组」，正是 zod 那条安全告警描述的形状。加了能从**数据侧**消掉那条路径，
+  完全不用碰 zod 版本；代价是改域 schema（`version` 与老数据兼容）、要定档再发版。
+  背景与它为什么没跟安全补丁一起做 → [决策记录](.agents/notes/2026-11-06-zod-pin.md) 的「替代方案 ①」。
+- [ ] **抬下限：把声明面接到宿主当前承诺线上** —— 宿主的承诺线已经往前走，而声明面还停在更早的族，
+  所以 `pnpm run check:declaration` 现在对 `next` 就是红的（每条声明都罩不住，不只一条）。
+  按「加一族要同批改三处」走：声明面、[compat.yml](.github/workflows/compat.yml) 矩阵、
+  [scripts/check-declaration.mjs](scripts/check-declaration.mjs) 的 `TRACKED_LINES`。
+  线名、现有各族的区间与逐条判定一律现查（`node scripts/compat-swap.mjs check` /
+  `pnpm run check:declaration`），**不抄进本文**。
 - [ ] 六条待产品决策的默认值 → [决策记录](.agents/notes/2026-09-17-implementation-deviations.md) 末节
-- [x] 重启宿主一次让后端半边生效（维护者已做，13:15）
-- [x] 本轮 UI 改动的收尾：文档同步、报告回填、提交
-- [x] 卡片的折叠头已按原生形态取消：不再有要持久化的折叠状态
 - [ ] 阶段 7 交付清单：截图 / 录屏需维护者配合
-- [x] **四张门面图已于第三轮全部重拍**（展示元数据 + 图标落地之后）：`settings-card*.png`、
-  `sidebar-popover*.png` 各两张，第三轮实测的拍法与判据写进了
-  [assets/AGENTS.md](assets/AGENTS.md)（侧栏按容器几何裁、长元素不碰 viewport）。
-- [x] 发布前：加回 `dsh.bundle`、去掉 `private` → `pnpm run check:release` 0 失败
-- [x] 六项发布面全部落地（assets / CONTRIBUTING / PUBLISHING / contract 配置 / 3 个 workflow / 3 个 script）→ [落地记录](.agents/notes/2026-09-17-release-surface-landing.md)
-  - **后记（2026-10-12）**：`CONTRIBUTING` 那项已**上提到组织级**（三仓同批，本仓不再自带）。本条保留当时的事实。
-- [x] 两张设置卡片截图已从真实界面实拍（中英各一张）→ 重截判据见 [assets/AGENTS.md](assets/AGENTS.md)
-- [x] 首次发布的手动配置：npm Trusted Publisher 已配、仓库 secret `DSH_CI_API_KEY` 已在、`v1.0.0` tag 与 Release 已建
-- [x] `release` environment 已由 release.yml 首次运行自动创建；想挂人工审批再加规则 → [发布手册](docs/PUBLISHING.md)
-- [x] **面板深链已接上**（2026-09-25）：宿主 `next` 线的 ui-plugin-manager provide 了 `pluginNavigation.openBundle(包名)` → 浮层右上角图标直达本插件的配置格；服务缺席（更早的宿主线）或调用抛错时**退回 Plugins 列表**，两条都不通只 `console.warn` 一笔。**措辞跟着落点分档**；判据、现象与本机宿主的那次勘误见[本轮记录](.agents/notes/2026-09-25-deep-link-needs-host-service.md)
-- [x] **深链已在本机生效**（2026-09-25）：维护者把宿主换到 provide 了那条服务的线上并重启，图标直达本插件的配置格。判据仍是**服务在不在**（三条 dist-tag 现查 `npm view @deepseek-ai/dsh dist-tags`），不是版本号
-- [x] **npm `latest` 已回填**（2026-09-25）：`dist-tags` 已翻到 `2.1.0`；产物一致性复验通过 —— 本地 `npm pack`（`7ded7f6` 那棵树）的 sha1 与 npm 上 2.1.0 的 `dist.shasum` **逐字节相同**
 - [ ] **浮层图标行为变了 → 涉及它的门面截图需重拍**（`sidebar-popover*.png`）：判据见 [assets/AGENTS.md](assets/AGENTS.md)
-- [ ] 本机 profile 升到 `2.1.3` 后实机验收本轮计时修复：浮层冷却从冷却值本身开始倒数（不再从 N+1）、按钮在截止时刻就能按、点刷新一定真的打一次上游
+- [ ] 本机 profile 升到含本轮计时修复的那一版后实机验收：浮层冷却从冷却值本身开始倒数（不再从 N+1）、
+  按钮在截止时刻就能按、点刷新一定真的打一次上游
 - [ ] `node scripts/acceptance.mjs` 的**上游那一段**（要真实 `DEEPSEEK_API_KEY`）：本轮发布前只跑了离线四项，退出码 2
 - [ ] **实机验收（两轮合并，都还没刷新看过）**：待维护者刷新界面确认 ——
   ① 处境重构那轮：左下角条目在、括号紧贴标题右侧、叉变小了、没接入时是 ＋ 而不是叉、切会话/切模型跟着换；
@@ -138,30 +126,17 @@
   账户不可用 / 数据已过期 / 暂无余额」。**注意 `stale` 与 `account-unavailable` 有数字也显文案**。
   mock 逐形态一眼过用 `?dsb=<处境键>`（**11 个处境全造得出来**，含 `checking` / `offline`；
   见 [docs/UI-HANDOFF.md](docs/UI-HANDOFF.md) §八）
-- [x] **这一轮已发版（2026-10-01）**：档位按判定链是 **minor** ——
-  Q0 有可观察变化；Q1 配置 / 数据 / 习惯**不失效**；Q2 新增「账号登录」来源 + 界面行为变化。
-  bump 与发布是两步（**bump 提交 → push → dispatch release.yml**，workflow 只发不 bump）。
-  发布后复核已按上面那条规则记进 GitHub Release 正文。
-  **这一版同时抬了宿主下限**（alpha 线用户要升到 RC 线），那一条按 Q2 记在同一个 minor 上
-- [x] **承诺线已换到 RC 线（2026-10-01）**：`engines.dsh` 与全部 23 条 `@deepseek-ai/dsh-*`
-  一起抬到那条线的起点（下限**现查** `package.json`）、删掉那批 token 回落值、README 安装指引改成 `@next`、
-  `check-declaration.mjs` 的 `TRACKED_LINE` 与 `compat.yml` 的矩阵都改成 `next`（alpha 停测）。
-  → [决策记录](.agents/notes/2026-10-01-track-rc-line.md)（含换线时旧 `node_modules` 会挡住解析这条坑）。
-  **同一条预发布语义的固有代价**：宿主换一个补丁位再推预发布，下限会再次罩不住，届时要再抬一次。
-  **版本号一律现查，不抄进文档**
-- [ ] **下一轮可能的抬下限**：宿主把补丁位往前推再发预发布时，现有下限会罩不住（同 `major.minor.patch` 才匹配），
-  届时按上面那条流程再走一遍
 
 ## 活跃坑
 
-- **`zod` 必须与宿主钉成同一个精确版本**（2026-10-19 巡检实红）：`@deepseek-ai/dsh-storage-domain`
-  在宿主当前线上把 `zod` 从 `^4.4.3` 收紧成**精确的 `4.4.3`**（同一 release 里另一个包又钉了更高的
-  精确版，上游自己就有两份），而本仓 `dependencies` 当时写的是 `^4.6.5` —— 装出两份 zod，类型互不兼容，
-  `typecheck` 报「`ZodType<...>` 不能赋给 `ZodType<...>` 而两条路径都是 `.pnpm/zod@<不同版本>`」。
-  所以本仓 `zod` 写**精确版**（= 宿主 storage-domain 那一份），**不是** `^` 区间：
-  写 `^4.4.3` 会解析回更高的 4.6.x，双份立刻回来。
-  判据：换线后 `typecheck` 报错里出现两个 `.pnpm/zod@<不同版本>`。
-  代价写在明处：**宿主下一次抬 zod 时本仓必须同批改这一个精确版**，否则静默回到两份 ——
+- **`zod` 的精确版必须仍落在宿主声明的那一份里**：`@deepseek-ai/dsh-storage-domain` 由宿主提供
+  （peer），而我们把 schema 交给它的 `domainTable()` —— 跨过这条边界的值必须来自同一个实例，
+  两份就是 `typecheck` 报「`ZodType<...>` 不能赋给 `ZodType<...>`，而两条路径都是
+  `.pnpm/zod@<不同版本>`」。所以本仓写**精确版**，**不是** `^` 区间（写 `^` 会解析到更高的小版本）。
+  **值不写在这里** —— 它的 home 是 `package.json`，判据是
+  `pnpm run check:declaration`（`SHARED_PINS` 段）：红的时候直接打印该把它改成哪个版本，
+  不用再从 TS2345 反推。**为什么当初这么定、这次为什么关掉那个安全修复的 bump、
+  以及否决过什么 → [决策记录](.agents/notes/2026-11-06-zod-pin.md)。**
   同型见下一条「宿主版本可能与 devDeps 错位」。
 - **宿主版本可能与 devDeps 错位**：本仓 devDeps 锁在某个宿主编译，实际运行的宿主可能更新。改代码前先跑 `dsh --version` 对比 `package.json` 的 devDeps；错位可能导致编译通过但运行时崩。升级 devDeps 要同步决定 `engines.dsh` 的兼容范围。连带一条：宿主线升级时**宿主包的传递依赖也可能被抬** —— 本仓若把它写死在旧版，包管理器会装出**两份同名包**，类型互不兼容 → 编译报「A 不能赋给 B」而两个路径都是 `node_modules`。判据：报错里出现两个不同层级的 `node_modules`；处置：把本仓那份升到与宿主同源的范围。核验兼容性用**仓库外**的临时目录装目标线宿主包。在仓内建目录的代价是双份的：包管理器把它当 workspace 成员，`add` 会顺带重排本仓 `node_modules`，并往锁文件写一条 **importer** 记录 —— 目录删了记录还在，而**本机安装不带 frozen 校验会静默自愈**，只有 CI 的 frozen 模式才判红（姊妹仓 2026-10-02 三平台齐红，失败在第一步 install）。判据：在锁文件里搜那个目录名；处置：重新解析，别手工编辑锁文件。
 - **`sidebar.footer.action` 的宿主容器是 row flex（宿主遗漏）**：官方 cordis 面板（`packages/extensions/ui-cordis/src/client/`）把根节点写成满宽且不收缩，横排下条目会被挤到 0 宽。我们已用 `:has()` 反选父元素把它改回纵向堆叠 → [决策](.agents/notes/2026-09-17-footer-stack-override.md)。依赖 `:has()` 与该锚点属性稳定。
