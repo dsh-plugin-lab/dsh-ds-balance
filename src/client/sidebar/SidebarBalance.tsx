@@ -25,10 +25,10 @@ import { createPortal } from 'react-dom'
 import {
   IconWarningOutlineRegular,
   Tooltip,
-  useAnchoredPosition,
   useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BalanceResponse } from '../api-types.ts'
+import { useAnchoredPosition } from './use-anchored-position.ts'
 import { interpolate, type LocaleKey } from '../locales.ts'
 import {
   cooldownSecondsOf,
@@ -379,7 +379,7 @@ export function SidebarBalance({
     setOpen((value) => !value)
   }, [])
 
-  // 定位交给官方 hook：量锚点、按 side/gap 偏移、钳进视口，
+  // 定位由本地 hook 算：量锚点、按 side/gap 偏移、钳进视口，
   // 并在 scroll（capture，覆盖嵌套滚动容器）、resize 与面板自身尺寸变化时重算。
   // 锚点就是我们这一整行：浮层左缘与行对齐（侧栏左缘）、向上展开，与官方用量浮层同构。
   // 打开时它确实会盖住上方邻居那一格（与官方 cordis 面板同构，维护者已确认可接受）；
