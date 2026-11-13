@@ -52,6 +52,12 @@
   弧的读法（`strokeDasharray` + `rotate(-90 …)`）也照它。四档颜色逐条对齐官方 `StateDot` 的
   `data-state`，`idle` 走官方为它新增的那条 `--dsw-alias-state-idle-primary`。
   几何口径由 [test/redlines.test.ts](../test/redlines.test.ts) 的「圆环几何」一组守住，别在组件里另写一套数。
+- **条目几何对的是「正下方那一行」—— 官方账号行**（头像 + 名字），不是面板行那一族：
+  行高 44 / 内边距 6 / 间距 8 / 左右各内缩 2px、图标窝 24×24（= 头像边长），
+  于是两行**等宽等高、图标列同宽、文字左缘逐像素对齐**。这是维护者点名的要求
+  （「因为和别的插件不一样，这个是左下角」）；判据与实测值见
+  [../src/client/sidebar/README.md](../src/client/sidebar/README.md)，
+  环的墨迹为什么是 21 而不是 24 也在那里。
 - **引官方 token 一律裸引，不写回落值**：本仓声明的宿主线（RC 线，现查 `package.json` 的 `engines.dsh`）
   上，圆角与焦点环那两族 token **一定存在** —— 回落值永远取不到，是死代码，
   还会让「声明什么就支持什么」这句话变含糊。换线之前反过来（那时声明的是 alpha 线，
