@@ -101,15 +101,34 @@ jobs:
         continue-on-error: ${{ !matrix.blocking }}
         run: node scripts/compat-swap.mjs swap --line ${{ matrix.line }} ${{ matrix.only }}
 
+      # 跑测试之前必须把清单与锁文件还原成提交时的样子：红线判的是**仓库的声明**，
+      # 不是这次临时的收窄形态。[test/redlines.test.ts](test/redlines.test.ts) 的
+      # 「每个 @deepseek-ai/dsh-* 区间与 engines.dsh 逐字相同」拿收窄后的清单去比，
+      # 而 `@deepseek-ai/dsh-deepseek-account-platform` **没有跟到承诺线的最新 rc**
+      # （`compat-swap` 的 verify 也如实报它停在旧版），于是它那一族留在旧值上、
+      # 与 `engines.dsh` 不再逐字相同 —— 那条红是判据错位，不是代码有问题（2026-11-13 实红）。
+      #
+      # **锁文件也必须一起还原**：swap 里的安装会把 `pnpm-lock.yaml` 重写成收窄后的 specifier，
+      # 只还原 `package.json` 会让两者对不上，后续每个 `pnpm run <script>` 都会先跑一次依赖校验、
+      # 撞 `ERR_PNPM_OUTDATED_LOCKFILE`。
+      #
+      # **而且还原之后不能再让 pnpm 自动装**：清单与锁都回到提交态、`node_modules` 却还是换线后的树，
+      # 自动安装会**静默把旧线的树装回来**，随后 typecheck / 测试跑在旧树上、报出一个假绿。
+      # 所以下面两步都带 `--config.verify-deps-before-run=false`，
+      # 判据是「换线后的树」而不是「重新解析回旧线的那棵树」。
+      - name: Restore the committed manifest and lockfile
+        if: always()
+        run: git checkout -- package.json pnpm-lock.yaml
+
       - name: Typecheck
         id: typecheck
         continue-on-error: ${{ !matrix.blocking }}
-        run: pnpm run typecheck
+        run: pnpm --config.verify-deps-before-run=false run typecheck
 
       - name: Test
         id: test
         continue-on-error: ${{ !matrix.blocking }}
-        run: pnpm test
+        run: pnpm --config.verify-deps-before-run=false test
 
       # 作业级 continue-on-error 免掉的是「阻断」，不是「可见」：
       # 哪条线、红在哪一步都进跟踪 issue —— 但只报**承诺线**（记录线红了不追issue，见文件头）。
