@@ -1392,6 +1392,101 @@ describe('菜单材质成对', () => {
 })
 
 /**
+ * 浮层定位只用 CSS 锚点：**锚点名在两侧各写一次，必须同名**。
+ *
+ * 这是宿主 0.2.2-rc.2 删掉 `useAnchoredPosition` 之后的唯一落点
+ * （为什么不用钩子、为什么不上 vendored 一份 → [决策记录](../.agents/notes/2026-11-13-css-anchored-popover.md)）。
+ *
+ * **为什么要一条红线盯着这两个字符串**：名字写在两份样式表里，改名只改一边时
+ * 类型检查、ESLint、构建全绿，界面上的表现却是面板飘到视口左上角（锚点解析不到，
+ * `anchor()` 退化成 0）。而且这条失败**只在打开浮层时**才看得见 —— 平时界面上一切正常。
+ * 判据同形于 [artifacts.test.ts](artifacts.test.ts) 那条产物级守卫：两边一个守符号、一个守配对。
+ */
+describe('浮层定位（CSS 锚点）', () => {
+  const anchorCss = readFileSync('src/client/sidebar/SidebarBalance.module.css', 'utf8')
+  const panelCss = readFileSync('src/client/sidebar/BalancePopover.module.css', 'utf8')
+  /** 面板那条规则的选择器：比 `.panel` 多一个 `section`（特异性理由见该规则上方的注释）。 */
+  const PANEL_SELECTOR = 'section.panel'
+
+  /** 读一条规则里某个属性的值（压成单空格）。 */
+  const valueOf = (css: string, selector: string, property: string): string | undefined =>
+    parseCssRules(css)
+      .find((rule) => rule.selectors.includes(selector))
+      ?.declarations.find(([name]) => name === property)?.[1]
+
+  /** 触发区根节点声明的锚点名（`anchor-name: --x`）。 */
+  const anchorName = valueOf(anchorCss, '.root', 'anchor-name')
+
+  it('触发区根节点声明了锚点，面板用 position-anchor 指同一个名字', () => {
+    expect(anchorName, '.root 该写 anchor-name').toBe('--dsb-balance-anchor')
+    // 同一个名字：改名只改一边就是「面板飘到视口左上角」，而编译与其它测试都绿。
+    expect(valueOf(panelCss, PANEL_SELECTOR, 'position-anchor')).toBe(anchorName)
+  })
+
+  it('尺寸四条必须能压过邻居那条全局 [role="dialog"] 规则（它是 !important 的）', () => {
+    // 本机 profile 里的 dsh-console-plugin（实测 0.5.73）注入 `dsh-console-narrow-css`：
+    // `@media (max-width: 520px) { [role="dialog"] { width: 100vw !important;
+    // height: 100vh !important; max-width: none !important; max-height: none !important; … } }`
+    // —— 命中的是页面上**每一个** dialog，于是 ≤520px 宽时我们的浮层被撑成整屏、
+    // 锚点定位被顶出视口（480×800 实测 rect = [12, -297, 480, 800]）。
+    // 带 `!important` 的声明只与同样带 `!important` 的比，再比特异性：`.panel` (0,1,0)
+    // 与 `[role="dialog"]` 同分，同级只看源码顺序（归模块加载与 HMR 管，靠不住），
+    // 所以两条一起用：`section.panel` 抬特异性 + 尺寸四条自己带 `!important`。
+    // 谁把 `!important` 当噪音删掉，这条会红 —— 那是别家缺陷的绕行，不是我们的洁癖。
+    for (const [property, expected] of [
+      ['width', 'max-content'],
+      ['height', 'auto'],
+      ['max-width', 'min(440px, calc(100vw - 24px))'],
+    ] as const) {
+      expect(valueOf(panelCss, PANEL_SELECTOR, property), property).toBe(`${expected} !important`)
+    }
+    // 特异性那一半也要在（少了它，同分的 `!important` 就退回看源码顺序）。
+    expect(parseCssRules(panelCss).some((rule) => rule.selectors.includes(PANEL_SELECTOR))).toBe(
+      true,
+    )
+  })
+
+  it('位置与尺寸上限写在面板那条规则里：向上展开、间距 8px、视口边距 12px', () => {
+    const panel = parseCssRules(panelCss).find((rule) => rule.selectors.includes(PANEL_SELECTOR))
+    const decl = (name: string): string | undefined =>
+      panel?.declarations.find(([property]) => property === name)?.[1]
+    // `position: fixed` 仍是必需的：面板 portal 到 document.body，锚点定位也要求它脱离文档流。
+    expect(decl('position')).toBe('fixed')
+    // 向上展开 = 底边贴锚点上缘 + 8px（从前 useAnchoredPosition 的 side: 'top' / gap: 8）。
+    expect(decl('bottom')).toBe('calc(anchor(top) + 8px)')
+    // 左缘跟随锚点并钳进视口 12px（从前那个 hook 的 margin: 12）。
+    const left = decl('left') ?? ''
+    expect(left.startsWith('clamp(12px, anchor(left), ')).toBe(true)
+    // 高度必须收紧，否则极端视口下面板会顶出视口上沿。
+    expect(decl('max-height')).toBeDefined()
+    // 溢出时的退路要在，否则 max-height 只是把内容切掉。
+    expect(decl('position-try-fallbacks')).toBe('--dsb-balance-window')
+  })
+
+  it('面板自己不滚（材质层会被滚走），滚动落在 .body 上', () => {
+    // `.panel::before` 是 `position: absolute; inset: 0` 的材质层，而滚动容器里的这种
+    // 伪元素会跟着内容滚走 —— 一旦面板滚动，下半截就没有填充、没有磨砂（Chromium 实测）。
+    expect(valueOf(panelCss, PANEL_SELECTOR, 'overflow-y')).toBeUndefined()
+    expect(valueOf(panelCss, '.body', 'overflow-y')).toBe('auto')
+    expect(valueOf(panelCss, '.body', 'min-height')).toBe('0')
+  })
+
+  it('组件侧不许自己量矩形算坐标（定位是 CSS 的事）', () => {
+    // 规矩的原文在 [sidebar/AGENTS.md](../src/client/sidebar/AGENTS.md)：CSS 锚点接管之后
+    // 「手写 getBoundingClientRect 定位」这条路仍然是禁的 —— 它会绕过标题栏留白与钳制。
+    for (const file of [
+      'src/client/sidebar/SidebarBalance.tsx',
+      'src/client/sidebar/BalancePopover.tsx',
+    ]) {
+      const source = stripComments(readFileSync(file, 'utf8'))
+      expect(source, `${file} 不该读矩形来定位`).not.toContain('getBoundingClientRect')
+      // 被删掉的钩子也不许回来：宿主上它已经不存在了，import 它就是渲染期崩溃。
+      expect(source, `${file} 不该引用 useAnchoredPosition`).not.toContain('useAnchoredPosition')
+    }
+  })
+})
+
+/**
  * 文档内的相对链接必须指向真实存在的文件。
  *
  * 这条把 [docs/AGENTS.md](../docs/AGENTS.md) 那句「改完跑一次链接校验」变成**机器执行**的 ——
