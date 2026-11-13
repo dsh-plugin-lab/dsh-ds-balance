@@ -52,13 +52,17 @@
 
 ### BalancePopover.module.css
 
-- 职责：浮层皮肤 —— **容器句**逐条对齐官方 `ui-chat` 的 `stat-dialog.module.css`（StatsPills 与 TurnUsagePanel 共用那套），**材质句**照同槽邻居的官方 cordis 面板 `packages/extensions/ui-cordis/src/client/CordisPanel.module.css`。
-- 关键导出：CSS Module 类 `panel` / `panel::before` / `title` / `titleLabel` / `titleRule` / `iconButton` / `details` / `notice` / `noticeText` / `noticeActions` / `footer` / `updated` / `status` / `refresh`。
+- 职责：浮层皮肤与**定位** —— **容器句**逐条对齐官方 `ui-chat` 的 `stat-dialog.module.css`（StatsPills 与 TurnUsagePanel 共用那套），**材质句**照同槽邻居的官方 cordis 面板 `packages/extensions/ui-cordis/src/client/CordisPanel.module.css`。
+- 关键导出：CSS Module 类 `panel` / `panel::before` / `body` / `title` / `titleLabel` / `titleRule` / `iconButton` / `details` / `notice` / `noticeText` / `noticeActions` / `footer` / `updated` / `status` / `refresh`，以及 `@position-try --dsb-balance-window`。
+- **定位全在这份样式表里**（CSS Anchor Positioning）：`.panel` 用 `position-anchor: --dsb-balance-anchor` 挂到触发区根节点（`SidebarBalance.module.css` 的 `.root` 写的 `anchor-name`）上，`bottom: calc(anchor(top) + 8px)` 向上展开、`left: clamp(12px, anchor(left), …)` 左缘对齐并钳进视口 12px、`max-height` 走视口、`position-try-fallbacks` 兜回极端情形。**JS 既不量尺寸也不传坐标**（宿主 rc.2 删掉了 `useAnchoredPosition`，见 [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)）。
+  - 选择器是 `section.panel`、尺寸几条带 `!important`：为了压过**另一个已装插件**注入的那张 ≤520px「手机版」样式表（它用全局 `[role="dialog"]` 选择器，把页面上**每一个**对话框都撑成整屏）。识别判据是**那条规则的选择器形状**，仓内不记对方的插件名。
+  - **`.body` 是 `<section>` 不是 `<div>`**：同一张样式表对 `[role="dialog"] > div` 写了一串 `!important`（overflow hidden、最末一个 div 自己滚），换成非 div 就一条都不命中。
+- **滚动在 `.body` 上、不在 `.panel` 上**：材质层是 `.panel::before` 的 `inset: 0` 绝对定位伪元素，放进滚动容器会跟着内容滚走，滚动后下半截就没有填充与磨砂。官方 `Menu` 同一结构（卡片不滚、内部 `.viewport` 滚）。
 - **材质分两层，别合回一层**：`.panel` 只留 `isolation: isolate` / `z-index` / 圆角 / `box-shadow` 与描边重绑；半透明填充与 `backdrop-filter: var(--dsw-menu-backdrop-filter)` 画在 `.panel::before` 上。理由两层：
   ① 官方规范要求写 `--dsw-specific-menu` 的表面在同一条规则里配那条滤镜（官方把菜单材质拆成了这两条 token）；
   ② 滤镜非 `none` 的元素会成为 fixed 后代的包含块，而本面板内部有两个**非 portal** 的 Tooltip 气泡（Plugins 图标与刷新按钮）——写在 `.panel` 上会让它们按视口算好的坐标变成相对面板的偏移，气泡直接跑出屏幕。
 - 被谁依赖：`BalancePopover.tsx`。
-- 改后必测什么：宽度三行（`max-content` + 上下界都随视口收缩）在窄窗口下不溢出；标题与明细之间只有一条分隔线；亮暗两色下文字仍可读；**悬停右上角 Plugins 图标与右下角刷新按钮时，气泡仍紧贴各自的按钮**（材质层回归判据）；**面板背后有内容时看得出模糊**。
+- 改后必测什么：宽度三行（`max-content` + 上下界都随视口收缩）在窄窗口下不溢出；**360 / 480 / 600 / 700 / 721 五个宽度下面板 rect 都落在视口 12px 内边距里**（真机量，见 [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)）；浮层底边与触发行上缘正好差 8px；标题与明细之间只有一条分隔线；亮暗两色下文字仍可读；**悬停右上角 Plugins 图标与右下角刷新按钮时，气泡仍紧贴各自的按钮**（材质层回归判据，它同时证明 `.panel` 上没有滤镜）；**面板背后有内容时看得出模糊**。
 
 ### PercentRing.tsx
 

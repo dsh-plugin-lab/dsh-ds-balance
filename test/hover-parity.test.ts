@@ -23,7 +23,6 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconWarningOutlineRegular: (): null => null,
   Tooltip: ({ label, side, children }: { label?: string; side?: string; children: ReactNode }) =>
     createElement('span', { 'data-tooltip': label ?? '', 'data-side': side ?? '' }, children),
-  useAnchoredPosition: (): null => null,
   useDismissOnOutsidePointer: (): void => {},
 }))
 

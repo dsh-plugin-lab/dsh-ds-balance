@@ -99,6 +99,30 @@ describe('构建产物', () => {
     expect(existsSync('lib/client.css')).toBe(false)
   })
 
+  it('产物里不许出现宿主已删掉的 ui-primitives 导出（useAnchoredPosition）', () => {
+    // **这条拦的是「编译过、测试绿、界面整块不渲染」那一类事故**（本仓真发生过）：
+    // 宿主 0.2.2-rc.2 的 ui-primitives 删掉了 `useAnchoredPosition` 的值导出与
+    // `AnchoredPositionOptions` 类型（宿主提交 2c990f0b，refactor(client): position floating
+    // panels with CSS anchors；官方迁移指南 docs/upgrade-guide/v0.2.2-alpha.2/
+    // css-anchored-menus/guide.zh.md），而我们在渲染期 import 它 ——
+    // 于是 slot entry 抛 `TypeError: ... is not a function`，宿主把这一格
+    // `sidebar.footer.action` 当成坏槽退役（DOM 里只剩 `[data-slot-error]`），
+    // 而 `pnpm test` / `typecheck` 全绿。
+    //
+    // **为什么只能靠产物面拦**：声明面判不出来。`engines.dsh` 里那一族写的是
+    // `^0.2.2-rc.1`，而 npm 的预发布语义下 `semver.satisfies('0.2.2-rc.2', '^0.2.2-rc.1')`
+    // 为 true —— 同一个 `major.minor.patch` 的后续预发布都在区间里，所以「区间罩得住」
+    // 与「符号还在」是两件事：**版本区间判不出符号被删**。
+    // 本仓 devDeps 装的还是更早那份（它有这个导出），所以 typecheck 也看不见这件事。
+    // 教训全文 → .agents/notes/2026-11-13-css-anchored-popover.md
+    const bundle = readFileSync('lib/client.js', 'utf8')
+    expect(bundle).not.toContain('useAnchoredPosition')
+    // 同一批被删的类型导出：它只活在声明面里，出现即说明有人把它 import 回来了。
+    expect(bundle).not.toContain('AnchoredPositionOptions')
+    // 反向控制：这条断言必须真的读到了那个模块的引用，否则「没出现」是空转的假绿。
+    expect(bundle, '产物里该有 ui-primitives 的其它引用').toContain('useDismissOnOutsidePointer')
+  })
+
   it('exports 与 dsh.client 指向真实存在的产物', () => {
     expect(existsSync(pkg.exports['./client']!.default!)).toBe(true)
     expect(existsSync(pkg.exports['./client']!.types!)).toBe(true)

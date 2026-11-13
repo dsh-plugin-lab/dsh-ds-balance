@@ -2,12 +2,14 @@
  * 余额浮层：点击条目后在条目的上方展开。
  *
  * 皮肤照抄官方「用量 / 用时」浮层（ui-chat 的 stat-dialog.module.css）；
- * 定位由父组件用 useAnchoredPosition 算好后经 style 传入，本组件只渲染表面。
+ * **定位全在 CSS 里**：面板用 `position-anchor` 挂到触发区根节点的 `anchor-name` 上
+ * （CSS Anchor Positioning，见 BalancePopover.module.css 的 .panel），
+ * 父组件既不量尺寸也不传坐标 —— 传进来的只有数据与回调。
  * 面板由父组件 createPortal 挂到 document.body，所以 panelRef 指向面板自身。
  * @module dsh-ds-balance/client/sidebar/BalancePopover
  */
 
-import type { CSSProperties, RefObject } from 'react'
+import type { RefObject } from 'react'
 import {
   Button,
   FishLogo,
@@ -94,10 +96,8 @@ export interface BalancePopoverProps {
    * 按兼容性硬约束两种语言下都照原文给，所以刻意不进双语词典。
    */
   configSlotWarning: string | null
-  /** 面板自身的引用：useAnchoredPosition 用它量尺寸，外部点击判定用它算「内部」。 */
+  /** 面板自身的引用：外部点击判定用它算「内部」（定位不读它，坐标全在 CSS 里）。 */
   panelRef: RefObject<HTMLElement>
-  /** 由 useAnchoredPosition 给出的 fixed 坐标；首帧是 MEASURE_STYLE（隐藏待测）。 */
-  style: CSSProperties
   /** 刷新回调。 */
   onRefresh: () => void
   /** 「改用 X」回调。 */
@@ -130,7 +130,7 @@ export interface PluginsAction {
 
 /**
  * 渲染余额浮层。
- * @param props - 选择结果、时间、刷新状态、面板 ref/style 与三个动作回调。
+ * @param props - 选择结果、时间、刷新状态、面板 ref 与三个动作回调。
  * @returns 浮层元素。
  */
 export function BalancePopover(props: BalancePopoverProps): JSX.Element {
@@ -144,7 +144,6 @@ export function BalancePopover(props: BalancePopoverProps): JSX.Element {
     cooldownSeconds,
     configSlotWarning,
     panelRef,
-    style,
     onRefresh,
     onUseShown,
     useShownDisabled,
@@ -185,115 +184,121 @@ export function BalancePopover(props: BalancePopoverProps): JSX.Element {
   )
 
   return (
-    <section
-      ref={panelRef}
-      className={css.panel}
-      style={style}
-      role="dialog"
-      aria-label={t('popover.title')}
-    >
-      <div className={css.title}>
-        {/* 标题与来源标签**合成一组**：这一行是 space-between 的两端布局，三个并列子元素会把
-            标签推到行中间。包起来之后标签紧贴标题右侧，右端仍由那个图标按钮占着。 */}
-        <span className={css.titleMain}>
-          {/* 标题就是这个账户在官网的用量页入口：图标与文字本身不变，只有文字带下划线且不变色
-              （宿主没有「链接色」这种语义 token，硬套会破配色纪律）。 */}
-          <a
-            className={css.titleLabel}
-            href="https://platform.deepseek.com/usage"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <FishLogo size={14} />
-            {t('popover.title')}
-          </a>
+    <section ref={panelRef} className={css.panel} role="dialog" aria-label={t('popover.title')}>
+      {/* 滚动容器是这一层，不是 .panel：面板上的 `::before` 才是材质层，而滚动容器里
+          `inset: 0` 的绝对定位伪元素会跟着内容一起滚走 —— 一旦滚动，下半截就露出
+          没有填充、没有磨砂的透明底（Chromium 实测）。官方 Menu 同一手法：
+          卡片不滚，内部 `.viewport` 滚。
+          **标签必须是 `<section>` 而不是 `<div>`**：另一个已装插件在 ≤520px 下对
+          `[role="dialog"] > div` 写了一串 `!important`（overflow hidden、让最后一个 div
+          自己滚），换成非 div 就一条都不命中（理由见该条 CSS 注释）。 */}
+      <section className={css.body}>
+        <div className={css.title}>
+          {/* 标题与来源标签**合成一组**：这一行是 space-between 的两端布局，三个并列子元素会把
+              标签推到行中间。包起来之后标签紧贴标题右侧，右端仍由那个图标按钮占着。 */}
+          <span className={css.titleMain}>
+            {/* 标题就是这个账户在官网的用量页入口：图标与文字本身不变，只有文字带下划线且不变色
+                （宿主没有「链接色」这种语义 token，硬套会破配色纪律）。 */}
+            <a
+              className={css.titleLabel}
+              href="https://platform.deepseek.com/usage"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <FishLogo size={14} />
+              {t('popover.title')}
+            </a>
 
-          {/* 来源标签是**链接外面的普通文本**：它描述这个数字的来路，不是官网用量页的入口 ——
-              放进链接里它会跟着下划线，读起来像标题的一部分。括号由词典给，这里只做拼接。
-              它显示的是**凭据身份**（掩码 key / 账号名），可能被 CSS 省略号截断，
-              所以 `title` 补一份完整值。 */}
-          {sourceLabel === null ? null : (
-            <span className={css.sourceLabel} title={sourceLabel}>
-              {sourceLabel}
-            </span>
+            {/* 来源标签是**链接外面的普通文本**：它描述这个数字的来路，不是官网用量页的入口 ——
+                放进链接里它会跟着下划线，读起来像标题的一部分。括号由词典给，这里只做拼接。
+                它显示的是**凭据身份**（掩码 key / 账号名），可能被 CSS 省略号截断，
+                所以 `title` 补一份完整值。 */}
+            {sourceLabel === null ? null : (
+              <span className={css.sourceLabel} title={sourceLabel}>
+                {sourceLabel}
+              </span>
+            )}
+          </span>
+
+          {/* 右上角：无可见文字的图标按钮，点了去本插件的配置格；宿主没有那条深链服务时
+              退回 Plugins 列表 —— 措辞跟着落点走，不承诺到不了的地方。
+              名字只能靠 aria-label 与 tooltip；动作缺席（宿主没有 layout 服务）时整块不渲染。 */}
+          {pluginsAction === undefined ? null : (
+            <Tooltip label={pluginsLabel} side="top" delayMs={500}>
+              <button
+                type="button"
+                className={css.iconButton}
+                aria-label={pluginsLabel}
+                onClick={pluginsAction.open}
+              >
+                <IconPluginPinwheelOutlineRegular size={16} />
+              </button>
+            </Tooltip>
           )}
-        </span>
+        </div>
 
-        {/* 右上角：无可见文字的图标按钮，点了去本插件的配置格；宿主没有那条深链服务时
-            退回 Plugins 列表 —— 措辞跟着落点走，不承诺到不了的地方。
-            名字只能靠 aria-label 与 tooltip；动作缺席（宿主没有 layout 服务）时整块不渲染。 */}
-        {pluginsAction === undefined ? null : (
-          <Tooltip label={pluginsLabel} side="top" delayMs={500}>
+        {/* 标题与明细之间唯一的一条分隔线；只靠边框成线，所以标 aria-hidden。 */}
+        <div className={css.titleRule} aria-hidden />
+
+        <dl className={css.details}>
+          <dt>{t('popover.total')}</dt>
+          <dd>{totalText}</dd>
+          <dt>{t('popover.granted')}</dt>
+          <dd>{grantedText}</dd>
+          <dt>{t('popover.toppedUp')}</dt>
+          <dd>{toppedUpText}</dd>
+        </dl>
+
+        {shown !== null && !selection.matchesPreference ? (
+          <div className={css.notice}>
+            <p className={css.noticeText}>
+              {interpolate(t('popover.mismatch'), {
+                wanted: displayCurrency,
+                shown: shown.currency,
+              })}
+            </p>
+            <div className={css.noticeActions}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={useShownDisabled === true}
+                onClick={onUseShown}
+              >
+                {interpolate(t('popover.action.useShown'), { shown: shown.currency })}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 缺配置槽的诊断行：只解释「为什么这里没有配置入口」并给升级指引，
+            不提供任何动作按钮 —— 升级宿主不是这个浮层能做的事。 */}
+        {configSlotWarning === null ? null : (
+          <div className={css.notice}>
+            <p className={css.noticeText}>{configSlotWarning}</p>
+          </div>
+        )}
+
+        <div className={css.footer}>
+          <span className={css.updated}>{updatedText}</span>
+          <span className={css.status} role="status">
+            {statusText}
+          </span>
+          <Tooltip label={refreshLabel} side="top" delayMs={500} disabled={refreshing || cooling}>
             <button
               type="button"
-              className={css.iconButton}
-              aria-label={pluginsLabel}
-              onClick={pluginsAction.open}
+              className={css.refresh}
+              aria-label={refreshLabel}
+              // 冷却期内也算不可用：点了不会发请求，按钮就该灰着，而不是只换一行文字。
+              disabled={refreshing || cooling}
+              data-refreshing={refreshing || undefined}
+              data-cooling={cooling || undefined}
+              onClick={onRefresh}
             >
-              <IconPluginPinwheelOutlineRegular size={16} />
+              <IconRefreshOutlineRegular size={16} />
             </button>
           </Tooltip>
-        )}
-      </div>
-
-      {/* 标题与明细之间唯一的一条分隔线；只靠边框成线，所以标 aria-hidden。 */}
-      <div className={css.titleRule} aria-hidden />
-
-      <dl className={css.details}>
-        <dt>{t('popover.total')}</dt>
-        <dd>{totalText}</dd>
-        <dt>{t('popover.granted')}</dt>
-        <dd>{grantedText}</dd>
-        <dt>{t('popover.toppedUp')}</dt>
-        <dd>{toppedUpText}</dd>
-      </dl>
-
-      {shown !== null && !selection.matchesPreference ? (
-        <div className={css.notice}>
-          <p className={css.noticeText}>
-            {interpolate(t('popover.mismatch'), { wanted: displayCurrency, shown: shown.currency })}
-          </p>
-          <div className={css.noticeActions}>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={useShownDisabled === true}
-              onClick={onUseShown}
-            >
-              {interpolate(t('popover.action.useShown'), { shown: shown.currency })}
-            </Button>
-          </div>
         </div>
-      ) : null}
-
-      {/* 缺配置槽的诊断行：只解释「为什么这里没有配置入口」并给升级指引，
-          不提供任何动作按钮 —— 升级宿主不是这个浮层能做的事。 */}
-      {configSlotWarning === null ? null : (
-        <div className={css.notice}>
-          <p className={css.noticeText}>{configSlotWarning}</p>
-        </div>
-      )}
-
-      <div className={css.footer}>
-        <span className={css.updated}>{updatedText}</span>
-        <span className={css.status} role="status">
-          {statusText}
-        </span>
-        <Tooltip label={refreshLabel} side="top" delayMs={500} disabled={refreshing || cooling}>
-          <button
-            type="button"
-            className={css.refresh}
-            aria-label={refreshLabel}
-            // 冷却期内也算不可用：点了不会发请求，按钮就该灰着，而不是只换一行文字。
-            disabled={refreshing || cooling}
-            data-refreshing={refreshing || undefined}
-            data-cooling={cooling || undefined}
-            onClick={onRefresh}
-          >
-            <IconRefreshOutlineRegular size={16} />
-          </button>
-        </Tooltip>
-      </div>
+      </section>
     </section>
   )
 }

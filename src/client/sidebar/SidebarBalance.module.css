@@ -13,6 +13,13 @@
   position: relative;
   display: flex;
   min-width: 0;
+  /* 余额浮层的 CSS 锚：面板（BalancePopover.module.css 的 .panel）用
+     `position-anchor: --dsb-balance-anchor` 指这个名字，位置与尺寸上限都在那边写。
+     为什么是固定字面量而不是运行期生成：这个槽只渲染**一个**实例，名字进 CSS 才能让
+     「锚点与面板指同一个名字」变成一条可断言的样式事实（redlines 里有一条配对断言）。
+     改名必须同批改 BalancePopover.module.css，漏一边的表现是面板飘到视口左上角。
+     原因链（为什么不用 JS 定位）→ .agents/notes/2026-11-13-css-anchored-popover.md */
+  anchor-name: --dsb-balance-anchor;
 }
 
 /* 间距约定：宿主 .footerActions 既没有 flex-direction 也没有 gap，

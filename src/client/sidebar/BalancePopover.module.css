@@ -1,32 +1,83 @@
-/* 浮层皮肤与定位照抄官方「用量 / 用时」浮层：
+/* 浮层皮肤照抄官方「用量 / 用时」浮层：
    packages/client/ui-chat/src/client/chat/stat-dialog.module.css
    （StatsPills 与 TurnUsagePanel 共用同一套）。
    **材质分两层**：容器（.panel）只留描边与投影，半透明填充与 backdrop-filter 画在隔离的
    背景伪元素（.panel::before）上 —— 配方抄同槽邻居官方 cordis 面板
    packages/extensions/ui-cordis/src/client/CordisPanel.module.css 的 .panel / .panel::before。
-   定位改用 ui-primitives 的 useAnchoredPosition，面板经 createPortal 挂到 document.body，
-   见 BalancePopover.tsx 与 SidebarBalance.tsx。 */
+   **定位用 CSS 锚点**（宿主 0.2.2-rc.2 删掉了 ui-primitives 的 useAnchoredPosition 值导出，
+   官方迁移指南 docs/upgrade-guide/v0.2.2-alpha.2/css-anchored-menus/guide.zh.md）：
+   触发区根节点的 anchor-name 是 --dsb-balance-anchor（SidebarBalance.module.css 的 .root），
+   面板用 position-anchor 指同一个名字，位置与尺寸上限全写在下面这条规则里。
+   面板经 createPortal 挂到 document.body，见 BalancePopover.tsx 与 SidebarBalance.tsx。 */
 
-.panel {
+/* 选择器是 `section.panel`、尺寸几条带 `!important`，都为了**压过另一个已装插件的全局对话框规则**：
+   它会往 `document.head` 注入一张「手机版」样式表，里面是
+   `@media (max-width: 520px) { [role="dialog"] { width: 100vw !important;
+   height: 100vh !important; max-width: none !important; max-height: none !important;
+   border-radius: 0 !important; padding: 0 !important; … } }`。
+   它命中的是**页面上每一个** `[role="dialog"]`，不是它自己的对话框 —— 于是 ≤520px 宽时
+   我们的浮层被撑成整屏、锚点定位被顶出视口（实测 480×800：rect = [12, -297, 480, 800]）。
+   **怎么认出它**：DevTools 里逐个 `<style data-plugin=…>` 找那条带 `@media (max-width: 520px)`
+   且选择器写着 `[role="dialog"]` 的规则 —— 判据是**选择器形状**，不记对方的插件名（会换）。
+   **为什么必须用 `!important`**：带 `!important` 的作者声明只与同样带 `!important` 的比，
+   比的是特异性 —— `.panel` (0,1,0) 与 `[role="dialog"]` 同分，同级只看源码顺序，
+   而样式表顺序归模块加载与 HMR 管，靠不住；`section.panel` 是 (0,1,1)，稳定压过它。
+   **为什么不换掉 `role="dialog"`**：那是这层浮层的无障碍语义（读屏要听出这是一个对话框），
+   为了躲一条别家的样式表而牺牲语义，代价比这几行 `!important` 大。
+   这条冲突是**别家的缺陷**（它假定页面上只有自己一个 dialog），已按此向那个插件的仓库报过 issue；
+   记进 .agents/notes/2026-11-13-css-anchored-popover.md。对方把选择器收窄之后，
+   这几行可以退回裸声明（红线钉着现状，改回时同批改那条断言）。
+   判据在 test/redlines.test.ts 的「浮层定位（CSS 锚点）」一组 —— 谁把 `!important` 删了，它会红。 */
+
+section.panel {
+  /* 底边贴在触发行上缘再留 8px（= 从前 useAnchoredPosition 的 gap: 8 / side: 'top'）：
+     面板尺寸由内容决定，所以它自下而上长出去，与官方 stat-dialog 同构。 */
   position: fixed;
+  position-anchor: --dsb-balance-anchor;
+  bottom: calc(anchor(top) + 8px);
+  /* 左缘与触发行对齐，再用 clamp 钳进视口 12px（= 从前那个 hook 的 margin: 12）。
+     上界按**面板最大宽度**算，所以最宽的一档也不会越过右边界 12px；
+     窄视口下 max-width 自己就收到 calc(100vw - 24px)，于是上下界相撞、退回 12px。
+     `anchor()` 只能出现在定位属性里（Chromium 实测：写进 max-height 会被算成 none），
+     所以水平方向在这里钳，垂直方向见下面的 max-height + position-try 回退。 */
+  left: clamp(12px, anchor(left), calc(100vw - 12px - min(440px, calc(100vw - 24px))));
+  /* 高度上限走视口。Windows 的标题栏 / macOS 的顶栏会占掉顶部一条，宿主把那个高度发在
+     --dsh-frame-overlay-top 上；**普通浏览器文档不发布它**，所以带回落是官方写法
+     （官方 stat-dialog 与 Menu.portal 逐字同形），不是我们加的兜底。
+     `!important` 的理由同下面那四条尺寸：邻居在 ≤520px 把它改成 `none !important`。 */
+  max-height: calc(100dvh - 12px - max(12px, var(--dsh-frame-overlay-top, 12px))) !important;
+  /* 极端情形（面板比触发行以上的空间还高）的退路：整块视口内展开、内部滚动。
+     官方 stat-dialog 的 --dsh-stat-window 是同一手法；默认位置溢出视口时浏览器才用它。 */
+  position-try-fallbacks: --dsb-balance-window;
+  /* 让下面的 .body 成为真正的滚动容器（见 .body 那条规则）。 */
+  display: flex;
+  flex-direction: column;
   /* 把 ::before 的 z-index: -1 关进本面板自己的层叠上下文，不让它漏到面板背后。
      面板本来就有 z-index，这一句是把「必须如此」写明；与官方 cordis 面板逐值一致。 */
   isolation: isolate;
   z-index: 1100;
   box-sizing: border-box;
   /* 按最宽的一行定尺寸，再夹在上下界之间；两个界都随视口收缩（左右各留 12px），
-     所以固定的下限不会把面板顶出定位钳制的范围。 */
-  width: max-content;
+     所以固定的下限不会把面板顶出定位钳制的范围。
+     尺寸这四条带 `!important`：邻居那条 ≤520px 的全局 `[role="dialog"]` 规则是 `!important` 的，
+     不带就一律被它盖掉（理由与上游缺陷见上面那段说明）。 */
+  width: max-content !important;
+  /* 显式写 auto：邻居那条写的是 `height: 100vh !important`，我们本来只写 max-height。 */
+  height: auto !important;
   min-width: min(300px, calc(100vw - 24px));
-  max-width: min(440px, calc(100vw - 24px));
-  padding: 16px;
+  max-width: min(440px, calc(100vw - 24px)) !important;
+  /* 内边距与圆角同样是邻居那条 `padding: 0 !important; border-radius: 0 !important` 的目标：
+     不 override 的话 ≤520px 下内容贴边、四个角变直角，材质层（::before 继承圆角）也跟着方掉。 */
+  padding: 16px !important;
+  /* 定位用的是 bottom，所以这里不能有默认外边距（浏览器给 section 的 margin 会加进偏移）。 */
+  margin: 0;
   border: 0;
   /* 圆角走官方语义 token，**裸引不写回落**：本仓声明的是 RC 线（`engines.dsh` 现查
      package.json），`--dsw-radius-*` 在声明范围内一定存在 —— 回落值永远取不到，是死代码。
      值的真源是官方刻度表（`RADIUS_SCALE`），改名或换值由「注释声称照官方」那组红线拦。
      corner-shape 不写：宿主 ui-theme 已给 `*` 配了 var(--dsw-corner-shape)（superellipse(1.5)），
      写 round 会掰回 superellipse(1)。 */
-  border-radius: var(--dsw-radius-lg);
+  border-radius: var(--dsw-radius-lg) !important;
   /* 填充挪到 .panel::before —— 见下面那条规则。 */
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
@@ -34,6 +85,35 @@
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
   cursor: default;
+}
+
+/* 滚动容器。**不能把 overflow 写在 .panel 上**：材质层是 `.panel::before` 的
+   `position: absolute; inset: 0`，而滚动容器里这种伪元素会跟着内容一起滚走 ——
+   一旦滚动，下半截就露出没有填充、没有磨砂的透明底（Chromium 实测，见
+   .agents/notes/2026-11-13-css-anchored-popover.md）。所以面板自己不滚（只被 max-height 夹住），
+   滚动落在这里。官方 Menu 是同一手法：卡片不滚，内部 `.viewport` 滚。
+   `min-height: 0` 是 flex 列的必需项 —— 缺了它，内容的最小高度会把它顶出 max-height。
+   **它是 `<section>` 不是 `<div>`，是为了躲开邻居那条 `[role="dialog"] > div`**：那条在
+   ≤520px 下给面板的每个 div 子元素写 `overflow: hidden !important`、并让最后一个 div 自己去滚 ——
+   命中的正是这一层与 `.footer`（面板内部的 div 于是成了「被邻居调过版」的容器）。
+   换成 `<section>` 之后那些后代选择器一条都落不到它身上，这条规则也就不需要打 !important 战争。 */
+.body {
+  min-height: 0;
+  overflow-y: auto;
+  /* 面板是滚动边界：滚到底不该把手势传给背后的列表。 */
+  overscroll-behavior: contain;
+}
+
+/* 极端情形的回退位置（见 .panel 的 position-try-fallbacks）：贴着视口上下各 12px 展开，
+   高度由这两条边撑开，内容实在放不下就在 .body 里滚。只覆盖位置相关的声明 ——
+   宽度、材质、颜色都还走 .panel。 */
+@position-try --dsb-balance-window {
+  position-area: none;
+  top: max(12px, var(--dsh-frame-overlay-top, 12px));
+  bottom: 12px;
+  max-height: none;
+  align-self: safe start;
+  justify-self: safe end;
 }
 
 /* 半透明菜单材质：填充与 backdrop-filter 必须成对画在这条隔离的背景层上。

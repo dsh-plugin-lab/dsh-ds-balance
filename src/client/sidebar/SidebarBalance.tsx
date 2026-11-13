@@ -12,20 +12,11 @@
  * @module dsh-ds-balance/client/sidebar/SidebarBalance
  */
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   IconWarningOutlineRegular,
   Tooltip,
-  useAnchoredPosition,
   useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BalanceResponse } from '../api-types.ts'
@@ -57,18 +48,6 @@ import css from './SidebarBalance.module.css'
 
 /** 模拟一次刷新的耗时（毫秒）。 */
 const REFRESH_SIMULATION_MS = 600
-
-/** 面板与触发区之间的间距（对齐官方 stat-dialog 的 PANEL_GAP）。 */
-const PANEL_GAP = 8
-
-/** 面板与视口各边的间距（对齐官方 stat-dialog 的 PANEL_MARGIN）。 */
-const PANEL_MARGIN = 12
-
-/**
- * 尚未定位时的面板样式：隐藏但仍参与布局，好让钳制在同一个 commit 里用真实尺寸量一次。
- * 与官方 stat-dialog 的 MEASURE_STYLE 逐字一致。
- */
-const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
 /** 一秒的毫秒数；相对时间与手动刷新冷却都按它换算。 */
 const MS_PER_SECOND = 1000
@@ -270,7 +249,10 @@ export function SidebarBalance({
   const provider = useRouteProvider(routeHint)
 
   const rootRef = useRef<HTMLDivElement>(null)
-  /** 面板在 portal 里，这个 ref 同时喂给 useAnchoredPosition（量尺寸）与外部点击判定。 */
+  /**
+   * 面板在 portal 里，这个 ref 只服务外部点击判定（`useDismissOnOutsidePointer` 的第 4 个参数）——
+   * 定位不再读它，坐标与尺寸上限全在 CSS 里（见本文件下方那段锚点注释）。
+   */
   const panelRef = useRef<HTMLElement>(null)
   const refreshTimer = useRef<number | undefined>(undefined)
   const lastScenario = useRef<string | null>(null)
@@ -379,19 +361,15 @@ export function SidebarBalance({
     setOpen((value) => !value)
   }, [])
 
-  // 定位交给官方 hook：量锚点、按 side/gap 偏移、钳进视口，
-  // 并在 scroll（capture，覆盖嵌套滚动容器）、resize 与面板自身尺寸变化时重算。
-  // 锚点就是我们这一整行：浮层左缘与行对齐（侧栏左缘）、向上展开，与官方用量浮层同构。
+  // 定位完全在 CSS 里（CSS Anchor Positioning），JS 不读矩形、不跟踪视口：
+  // 触发区根节点带 `anchor-name: --dsb-balance-anchor`（SidebarBalance.module.css 的 .root），
+  // 面板用 `position-anchor` 指同一个名字，`bottom: calc(anchor(top) + 8px)` 让它向上展开、
+  // 左缘与行对齐并钳进视口 12px，尺寸上限也写在同一条规则里（BalancePopover.module.css 的 .panel）。
+  // **为什么不再用钩子**：宿主 0.2.2-rc.2 删掉了 `useAnchoredPosition` 的值导出
+  // （官方迁移指南 docs/upgrade-guide/v0.2.2-alpha.2/css-anchored-menus/guide.zh.md），
+  // 那是**渲染期**才炸的 —— 条目整块被宿主当成坏槽退役，而编译与测试全绿。
   // 打开时它确实会盖住上方邻居那一格（与官方 cordis 面板同构，维护者已确认可接受）；
   // 关键是关闭时点邻居要落到邻居身上 —— 那由触发按钮不写 aria-haspopup 保证。
-  const pos = useAnchoredPosition({
-    open,
-    anchorRef: rootRef,
-    panelRef,
-    side: 'top',
-    gap: PANEL_GAP,
-    margin: PANEL_MARGIN,
-  })
 
   // 相对时间与冷却秒数只在浮层打开时推进。**打开这一帧要先把「现在」拨正**：
   // 它是上次关闭时留下的旧值，直接拿它去算会让年龄与冷却闪一下旧数；
@@ -697,7 +675,6 @@ export function SidebarBalance({
               cooldownSeconds={cooldownSeconds}
               configSlotWarning={configSlotState === 'missing' ? CONFIG_SLOT_WARNING : null}
               panelRef={panelRef}
-              style={pos ?? MEASURE_STYLE}
               onRefresh={handleRefresh}
               onUseShown={handleUseShown}
               useShownDisabled={!config.writable}
