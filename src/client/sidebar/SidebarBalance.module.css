@@ -28,12 +28,17 @@
    所以这里照同一个取值写，不要指望容器给间距：两件之间的空隙只由下面那件的
    上外边距决定。也不建议给宿主容器补 gap，那会改动另外两个插件的间距。 */
 
-/* 展开：整行条目，与 Settings 行同样的 ±2px 外扩做光学对齐。
-   整行只在不换行的 row flex 里才危险；容器改成纵向后这里没有争抢。 */
+/* 展开：整行条目，**逐值对齐官方账号行**（头像那一行，就在我们正下方）：
+   宿主 `ui-settings-account/src/client/AccountMenu.module.css` 的 `.trigger`
+   —— 行高 44、内边距 6、间距 8、圆角 `--dsw-radius-md`、`margin-inline: 2px` 的内缩。
+   真机实测（侧栏 280px）：账号行 x=10 / w=260 / h=44 / padding 6 / gap 8，头像 24×24，
+   标签左缘 x=48。所以这里同样内缩 2px（父容器 x=8 ⇒ 我们 x=10），
+   于是「24px 图标 + 8px 间距 + 6px 内边距」把标签也送到 x=48 —— 两行文字左缘逐像素对齐。
+   从前是 `width: calc(100% + 4px)` + 负外边距（±2px 外扩），那套对齐的是面板行那一族，
+   与正下方的头像行差 4px，看起来「和邻居不是一套」。 */
 .root[data-mode='wide'] {
   flex: none;
-  width: calc(100% + 4px);
-  margin: 4px -2px 0;
+  margin: 4px 2px 0;
 }
 
 /* 折叠：36×36 圆形命中区，与轨道上其它控件同尺寸。
@@ -70,13 +75,14 @@
   outline-offset: -2px;
 }
 
-/* 展开：撑满整行，行高与官方的 42px 条目一致。 */
+/* 展开：撑满整行。行高 44 / 内边距 6 / 间距 8 与官方账号行逐值相同（见 `.root[data-mode='wide']`
+   上方那段）；图标窝 24×24 也与它的头像同大，所以标签左缘落在同一个 x 上。 */
 .root[data-mode='wide'] .trigger {
   flex: none;
   gap: 8px;
   width: 100%;
-  height: 42px;
-  padding: 0 10px 0 8px;
+  height: 44px;
+  padding: 6px;
   border-radius: var(--dsw-radius-md);
 }
 
@@ -92,14 +98,17 @@
   border-radius: var(--dsw-radius-md);
 }
 
-/* 展开态圆环的固定窝：16×16，保证金额起点不随环径（16 vs 折叠态 18）变化。 */
+/* 圆环的固定窝：24×24 —— **与官方账号行的头像同大**（`AccountMenu.module.css` 的 `.avatar`
+   是 24×24 圆），这样两行的图标列同宽、标签左缘也就对齐了（真机：两者都在 x=48）。
+   折叠态与展开态共用这一个窝：官方折叠态的头像也是同一个 24px，所以环径不再随形态变。
+   从前这里是 16（展开）/ 18（折叠），比正下方的头像小一圈，视觉上「不是一个列表里的东西」。 */
 .icon {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
 }
 
 /* 标签：紧跟圆环、靠左，不参与分配剩余宽度（金额已经不在这一行里了）。
