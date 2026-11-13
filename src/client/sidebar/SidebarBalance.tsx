@@ -617,7 +617,9 @@ export function SidebarBalance({
       {wide ? (
         <>
           <span className={css.icon}>
-            <PercentRing state={ring.state} marker={ring.marker} ratio={ringRatio} size={16} />
+            {/* 环径 = 官方账号行头像的边长（24）：两行的图标列同宽，标签左缘才会对齐。
+                环径由 CSS 的 `.icon` 定窝、这里给同一个数，改一处必须同改另一处（红线钉着）。 */}
+            <PercentRing state={ring.state} marker={ring.marker} ratio={ringRatio} size={24} />
           </span>
           <span className={css.label}>{t('sidebar.label')}</span>
           {markerLabel === null ? null : (
@@ -633,7 +635,8 @@ export function SidebarBalance({
           state={ring.state}
           marker={ring.marker}
           ratio={ringRatio}
-          size={18}
+          // 与展开态同一个环径：官方折叠态的头像也是 24px，两态只差命中区（36×36）。
+          size={24}
           // 收起态的交付通道：SVG 原生 `<title>`。内容与展开态那条 Tooltip **同源**
           // （都来自上面的 `hoverText`），`null` 时连 `<title>` 都不渲染。
           title={hoverText ?? undefined}

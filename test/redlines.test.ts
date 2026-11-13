@@ -1490,6 +1490,54 @@ describe('浮层定位（CSS 锚点）', () => {
 })
 
 /**
+ * 条目几何对齐的是**正下方那一行**：官方账号行（头像 + 名字）。
+ *
+ * **为什么单列一组**：这条约束的判据是**跨仓的、看得见的对齐**，而它没有任何编译期信号 ——
+ * 行高改 2px、图标窝从 24 缩回 16、把 ±2px 外扩那套写回来，界面照常渲染，
+ * 只是「和正下方那行不是一套」（维护者实机一眼看出来的正是这个）。
+ * 基准值是**真机实测 + 宿主 CSS** 双份对齐过的（宿主 `ui-settings-account/src/client/AccountMenu.module.css`
+ * 的 `.trigger` / `.avatar`，rc.2）：行高 44、内边距 6、间距 8、`margin-inline` 2、
+ * 头像 24×24 ⇒ 标签左缘 x=48。
+ *
+ * **限制说清楚**：那个官方包不在本仓的依赖里（`node_modules` 没有它），所以这条**读不到官方 CSS**
+ * 来做逐值比对，钉的是「我们这边必须是这组值 + 出处写在注释里」。改官方值时要人工回宿主源码核。
+ */
+describe('条目几何（对齐官方账号行）', () => {
+  const css = readFileSync('src/client/sidebar/SidebarBalance.module.css', 'utf8')
+  const tsx = readFileSync('src/client/sidebar/SidebarBalance.tsx', 'utf8')
+  const decl = (selector: string, property: string): string | undefined =>
+    parseCssRules(css)
+      .find((rule) => rule.selectors.includes(selector))
+      ?.declarations.find(([name]) => name === property)?.[1]
+
+  it('展开态：行高 44 / 内边距 6 / 间距 8 / 左右内缩 2px', () => {
+    // 四项都与官方账号行逐值相同；行宽靠父容器 stretch + 2px 外边距得到（账号行也是内缩 2px，
+    // 不是外扩），所以这里**不许**再出现 `calc(100% + 4px)` 那套外扩。
+    expect(decl(".root[data-mode='wide'] .trigger", 'height')).toBe('44px')
+    expect(decl(".root[data-mode='wide'] .trigger", 'padding')).toBe('6px')
+    expect(decl(".root[data-mode='wide'] .trigger", 'gap')).toBe('8px')
+    expect(decl(".root[data-mode='wide']", 'margin')).toBe('4px 2px 0')
+    // 注释里还留着「已装第三方插件的 .entry 是 calc(100% + 4px)」这句实情，所以先剥注释再判。
+    expect(stripComments(css), '不许退回 ±2px 外扩').not.toContain('calc(100% + 4px)')
+  })
+
+  it('图标窝与环径都是 24（= 官方头像边长），两态同一个窝', () => {
+    expect(decl('.icon', 'width')).toBe('24px')
+    expect(decl('.icon', 'height')).toBe('24px')
+    // 组件里两处 <PercentRing> 的 size 都必须是 24：窝是 24 而环径还留 16/18 时，
+    // 环会在窝里偏小，标签左缘也跟着漂（那正是改之前的样子）。
+    const sizes = [...tsx.matchAll(/<PercentRing[\s\S]{0,400}?size=\{(\d+)\}/g)].map((m) => m[1])
+    expect(sizes, 'PercentRing 的 size 出现次数').toHaveLength(2)
+    for (const size of sizes) expect(size, '环径必须等于图标窝').toBe('24')
+  })
+
+  it('折叠态命中区仍是 36×36（官方折叠态同值），环径不随形态变', () => {
+    expect(decl(".root[data-mode='rail'] .trigger", 'width')).toBe('36px')
+    expect(decl(".root[data-mode='rail'] .trigger", 'height')).toBe('36px')
+  })
+})
+
+/**
  * 文档内的相对链接必须指向真实存在的文件。
  *
  * 这条把 [docs/AGENTS.md](../docs/AGENTS.md) 那句「改完跑一次链接校验」变成**机器执行**的 ——
