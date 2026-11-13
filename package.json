@@ -120,7 +120,8 @@
     "react-dom": "^18.3.1",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.70.1",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "yaml": "^2.9.1"
   },
   "dependencies": {
     "zod": "4.6.6"
