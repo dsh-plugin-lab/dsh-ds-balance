@@ -68,6 +68,16 @@
 - **弧长是唯一读阈值的去处，且只读 `warn`**：弧长 = 余额 / 该币种 `warn` 阈值，封顶 1，金额比较走整数不走浮点。
   阈值没配或非正数时退回按 `severity` 定性：`ok` 与 `unavailable` 满环、`warn` 3/4、`critical` 1/4、`unknown` 空环。
   判据只有 [../src/client/model.ts](../src/client/model.ts) 的 `ringRatioOf` 一处 —— 别在组件里再算一遍。
+- **浮层定位只用 CSS 锚点（CSS Anchor Positioning），JS 不参与**：触发区根节点写
+  `anchor-name`，面板写 `position-anchor` 指同一个名字，位置与尺寸上限都在样式表里。
+  这条不是风格偏好 —— 宿主在 RC 线的一个 rc 之间删掉了 `ui-primitives` 的
+  `useAnchoredPosition`，而它是**渲染期**才炸的：整条条目会被宿主当成坏槽退役，
+  而 `tsc` 与全量测试全绿。所以判据落在**产物面**（`test/artifacts.test.ts` 断言
+  `lib/client.js` 里不出现该符号）与**样式面**（`test/redlines.test.ts` 的
+  「浮层定位（CSS 锚点）」一组：两侧锚点名必须同名、`bottom` 必须是那条算式）。
+  规则与配方的真源在 [../src/client/sidebar/AGENTS.md](../src/client/sidebar/AGENTS.md)，
+  为什么不用钩子 / 为什么不上 vendored 一份 / 与邻居样式表的冲突怎么处置
+  → [决策记录](../.agents/notes/2026-11-13-css-anchored-popover.md)。
 
 ## 关键决策
 

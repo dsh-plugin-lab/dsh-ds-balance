@@ -189,9 +189,9 @@ export function BalancePopover(props: BalancePopoverProps): JSX.Element {
           `inset: 0` 的绝对定位伪元素会跟着内容一起滚走 —— 一旦滚动，下半截就露出
           没有填充、没有磨砂的透明底（Chromium 实测）。官方 Menu 同一手法：
           卡片不滚，内部 `.viewport` 滚。
-          **标签必须是 `<section>` 而不是 `<div>`**：profile 里那个 dsh-console-plugin 在
-          ≤520px 下对 `[role="dialog"] > div` 写了一串 `!important`（overflow hidden、
-          让最后一个 div 自己滚），换成非 div 就一条都不命中（理由见该条 CSS 注释）。 */}
+          **标签必须是 `<section>` 而不是 `<div>`**：另一个已装插件在 ≤520px 下对
+          `[role="dialog"] > div` 写了一串 `!important`（overflow hidden、让最后一个 div
+          自己滚），换成非 div 就一条都不命中（理由见该条 CSS 注释）。 */}
       <section className={css.body}>
         <div className={css.title}>
           {/* 标题与来源标签**合成一组**：这一行是 space-between 的两端布局，三个并列子元素会把

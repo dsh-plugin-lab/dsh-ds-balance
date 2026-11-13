@@ -54,15 +54,39 @@
 
 - 浏览器需支持 `anchor-name` / `position-anchor` / `anchor()`。宿主自己已经这么要求
   （官方 `ui-model-selection` 同款），所以插件侧**不再增加**额外门槛。
+- **`anchor()` 不能进 `max-height`**（Chromium 实测：写进去整条声明被算成 `none`，
+  只有 `anchor-size()` 在那里有效）。所以高度上限走 `100dvh`，
+  「面板比触发行以上空间还高」这种极端情形交给 `position-try-fallbacks` 回退
+  （官方 `stat-dialog` 的 `--dsh-stat-window` 是同一手法）。
+- **材质层不能在滚动容器里**：`.panel::before` 是 `position: absolute; inset: 0`，
+  放进滚动容器就会跟着内容滚走，滚动后下半截没有填充也没有磨砂（实测）。
+  所以面板自己不滚，滚动落在内部的 `<section class="body">` 上 —— 官方 `Menu` 同一结构
+  （卡片不滚、内部 `.viewport` 滚）。
 - 首帧不再需要「隐藏等测量」（原 `MEASURE_STYLE`），浮层打开即定位，已真机确认无跳位。
-- **一个既有冲突被暴露出来**：邻居插件 `dsh-console-plugin`（本机 0.5.73）在 `apply` 时
-  往 `document.head` 注入 `#dsh-console-narrow-css`，里面有
-  `@media (max-width: 520px) { [role=dialog] { width: 100vw !important; height: 100vh !important; … } }`
-  —— 它命中的是**页面上每一个** `[role="dialog"]`，不是它自己的对话框。≤520px 宽时把我们的浮层
-  撑成整屏（实测 480×800：`rect = [12, -297, 480, 800]`）。处置：选择器写成 `section.panel`
-  （特异性 (0,1,1) 压过 `[role="dialog"]` 的 (0,1,0)）并给尺寸四条加 `!important`；
-  **不换掉 `role="dialog"`** —— 那是读屏需要的语义，为躲别家样式表牺牲语义不值。
-  这是**别家的缺陷**（它假定页面上只有自己一个 dialog）；上游修好后这四行可以退回裸声明。
+- **一个既有冲突被暴露出来**：profile 里另装的一个第三方插件会在 `apply` 时往 `document.head`
+  注入一张 `@media (max-width: 520px)` 的「手机版」样式表，**它用的选择器是全局的
+  `[role="dialog"]` 与 `[role="dialog"] > div`，不是它自己的对话框**。`role="dialog"` 是无障碍
+  语义，凡是能被读屏识别的第三方弹层都会用它 —— 于是那条规则命中的是页面上的每一个对话框。
+  **怎么认出它**：在 DevTools 里逐个 `<style data-plugin=…>` 找「带 `@media (max-width: 520px)`
+  且选择器写着 `[role="dialog"]`」的那张；判据是**选择器形状**，不是插件名。
+  逐条处置：
+
+  | 那张样式表写了什么 | 后果（实测） | 我们的处置 |
+  |---|---|---|
+  | `[role="dialog"] { width:100vw !important; height:100vh !important; max-*: none !important; padding:0 !important; border-radius:0 !important }` | 480×800 下浮层被撑成整屏、锚点定位整块顶出视口（`rect = [12, -297, 480, 800]`） | 选择器抬到 `section.panel`（(0,1,1) 压过 (0,1,0)）＋ 尺寸 / `padding` / `border-radius` 自己带 `!important` |
+  | `[role="dialog"] > div { overflow:hidden !important; … }`、`> div:last-child { overflow-y:auto !important }` | 滚动容器 `.body` 变成 `overflow:hidden`、`.footer` 被迫自己去滚 | 滚动容器用 **`<section class="body">` 而不是 `<div>`** —— 后代选择器一条都落不到它身上（改结构的代价比再打一轮 `!important` 战争小） |
+  | 同一条媒体查询里的抽屉：`div[class*="_sidebarCol"] { position: fixed; z-index: 1310 !important }` | ≤520px 下侧栏抽屉（宿主原本只是 `z-index: 71`）**盖住**我们 `z-index: 1100` 的浮层 —— 几何正确但看不见 | **不处置**：1100 是官方浮层那一档（宿主 `stat-dialog` / `Menu.portal` 同值），为一个邻居的抽屉抬到更高会连带压过宿主的其它浮层 |
+
+  **不换掉 `role="dialog"`**：那是读屏需要的语义，为躲别家样式表牺牲语义不值。
+  那张样式表把选择器收窄回它自己的对话框之后，上面那些 `!important` 与 `<section>` 都可以
+  退回裸声明与 `<div>`（红线钉着现在的形状，改回时要同批改那条断言）。
+  **这一条是别家的缺陷，不是本仓的**：已按「全局 `[role="dialog"]` 选择器会命中别人的对话框」
+  向那个插件的仓库报了一条 issue（2026-11-13，本轮）。**仓内不记对方的名字与地址** ——
+  它会换、也不是我们的依赖；认识它靠上面那条「怎么认出它」的选择器判据。
+- 宿主的 `useAnchoredPosition` 在本仓 devDeps 那一档**还在**（装的是更早的 rc），
+  所以 `tsc` 与全量测试都看不见这次删除 —— 这也是为什么判据只能盯**产物**。
+  devDeps 与在跑宿主之间的这条错位本身是既有活跃坑（见根 `AGENTS.md` 的「活跃坑」），
+  抬 devDeps 要连同 `engines.dsh` 一起决定，不在本次改动范围内。
 - 教训一句话：**「声明面罩得住」不等于「符号存在」**。跨 rc 的符号删除只能靠产物级判据拦，
   所以 `test/artifacts.test.ts` 那条断言是本仓此后唯一能防住同型事故的东西。
 
