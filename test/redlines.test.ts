@@ -28,6 +28,15 @@ function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
+/**
+ * 声明面对外承诺的宿主族 —— **唯一一处**。
+ *
+ * 2026-11-13 从四族收成一族：宿主的 0.2.2 rc 线删掉了本仓依赖的符号
+ * `useAnchoredPosition`，旧的三条族承诺随之跑不起来 —— 承诺了却跑不了，
+ * 比缩窄更不诚实。
+ */
+const PROMISED_FAMILIES = ['^0.2.2-rc.1'] as const
+
 describe('依赖分层', () => {
   it('@deepseek-ai/* 绝不进 dependencies', () => {
     const runtime = Object.keys(pkg.dependencies ?? {})
@@ -740,13 +749,15 @@ describe('设置接缝', () => {
     expect([...ranges]).toEqual([pkg.engines?.dsh])
   })
 
-  it('engines.dsh 承诺 0.1.7 与全部 RC 族（|| 并集），删掉一族等于缩窄对外承诺', () => {
-    // 0.1.7 那族是**真实兼容修复**：有使用者停在 0.1.7 族宿主上，2026-10-01 换线时下限被抬到
-    // RC 族起点，把他们判成了不兼容。删掉这一族会让那批使用者再次装不上，且没有任何别处会红。
+  it('engines.dsh 的族与 PROMISED_FAMILIES 一致，增删一族等于改对外承诺', () => {
+    // 原先这条断言的是「承诺四族 + 稳住 0.1.7」，读的是**已提交**的声明
+    // （`git show HEAD:package.json`，因为 compat 巡检的 `swap --only` 会把工作区
+    // 临时收窄成单族去测低族，判工作区会把测量误报成「声明面缩窄」）。
     //
-    // 读**已提交**的那份声明（`git show HEAD:package.json`）：compat 巡检的 `swap --only` 会把
-    // 工作区清单**临时收窄成单族**去测低族（一次性测量、不提交），判工作区会把测量误报成
-    // 「声明面缩窄」。无 git 时读不到已提交那份 —— 跳过本条而不是误判。
+    // 那组断言的问题在于：它把「几族」写成了字面量，于是**每当声明面真的需要变**，
+    // 改的必是断言本身 —— 而一条「因为改了实现所以必须改」的判据，判不出
+    // 「这是不是有意的」。改成对着 `PROMISED_FAMILIES` 逐项比：族清单只写一处，
+    // 增删一族当场红，逼人回来确认。
     const committed = (() => {
       try {
         const r = spawnSync('git', ['show', 'HEAD:package.json'], { encoding: 'utf8' })
@@ -760,18 +771,11 @@ describe('设置接缝', () => {
     const engine = committed.engines?.dsh ?? ''
     const families = engine
       .split('||')
-      .map((branch) => /(\d+)\.(\d+)\.(\d+)/.exec(branch)?.[0])
-      .filter((t): t is string => t !== undefined)
-    expect(families, 'engines.dsh 读不出四族').toHaveLength(4)
-    expect(families).toContain('0.1.7')
-    // 第二、三族的**元组**不写死：宿主每往前推一个补丁位的预发布，就得手工把它抬一次
-    // （npm 只匹配同一 major.minor.patch 且带预发布段的比较子）。写死元组会让每轮换线都要改测试，
-    // 而这条红线要守的是「别把承诺的族悄悄删掉」。元组本身由「逐字相同」那条与
-    // [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的换线流程一起守。
-    expect(
-      families.filter((tuple) => tuple !== '0.1.7'),
-      'engines.dsh 承诺的 RC 族不足三族（0.2.0 / 0.2.1 / 0.2.2 都得在）',
-    ).toHaveLength(3)
+      .map((branch) => branch.trim())
+      .filter((branch) => branch !== '')
+    expect(families, `已提交的 engines.dsh 与 PROMISED_FAMILIES 不一致：${engine}`).toEqual([
+      ...PROMISED_FAMILIES,
+    ])
   })
 })
 
