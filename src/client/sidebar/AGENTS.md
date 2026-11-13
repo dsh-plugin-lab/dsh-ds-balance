@@ -23,16 +23,24 @@ sidebar/ 特有约束：
   - 理由：面板 portal 出去后不再是根元素的 DOM 后代，不传就会被判成「外部」，点浮层内部也会关闭。
 - 浮层定位**全在 CSS 里**（CSS Anchor Positioning），不许用 JS 读矩形定位、也不许跟踪滚动/视口重算。
   - 两侧各写一次锚点名：触发区根节点 `anchor-name: --dsb-balance-anchor`（`SidebarBalance.module.css` 的 `.root`），
-    面板 `position-anchor: --dsb-balance-anchor`（`BalancePopover.module.css` 的 `.panel`）。**改名必须同批改两处**，
+    面板 `position-anchor: --dsb-balance-anchor`（`BalancePopover.module.css` 的 `section.panel`）。**改名必须同批改两处**，
     漏一边的表现是面板飘到视口左上角。
   - 位置公式：`bottom: calc(anchor(top) + 8px)`（向上展开、间距 8，= 从前的 `side: 'top'` / `gap: 8`）+
     `left: clamp(12px, anchor(left), …)`（左缘对齐并钳进视口 12px，= 从前的 `margin: 12`）+ `max-height` 视口上限
     + `position-try-fallbacks` 兜底。
+  - **`anchor()` 进不了 `max-height`**（Chromium 实测：整条声明被算成 `none`，只有 `anchor-size()` 在那里有效），
+    所以垂直上限走 `100dvh`、极端情形靠 `position-try-fallbacks` 回退 —— 别试图把 `anchor(top)` 写进去。
+  - **滚动在 `.body` 上、不在 `.panel` 上**，且 `.body` 的元素名是 `<section>`：材质层是 `.panel::before` 的
+    `inset: 0`，放进滚动容器会跟着内容滚走（滚动后下半截没有填充与磨砂）；而 `<div>` 会被另一个已装插件的
+    `[role="dialog"] > div` 那条 `!important` 规则改写。两条都由红线钉着，改元素名或搬滚动位置要同批改断言。
+  - **选择器是 `section.panel`、尺寸几条带 `!important`**：另一个已装插件在 ≤520px 用**全局** `[role="dialog"]`
+    选择器把页面上每一个对话框撑成整屏。识别靠**那条规则的选择器形状**，仓内不记对方的插件名
+    （它会换，也不是我们的依赖）。对方收窄选择器后可退回裸声明 —— 那时同批改红线。
   - 理由：宿主在 RC 线的一个 rc 之间删掉了 `primitives` 的 `useAnchoredPosition`（官方迁移指南
     `docs/upgrade-guide/v0.2.2-alpha.2/css-anchored-menus/guide.zh.md`；被跟的那条线见 `package.json` 的 `engines.dsh`）。
     它在**渲染期**才炸，表现是整条条目被宿主当成坏槽退役，而 `tsc` 与全量测试全绿 —— 只有产物级判据拦得住。
   - 判据：`test/artifacts.test.ts`（产物里不许出现该符号）+ `test/redlines.test.ts` 的「浮层定位（CSS 锚点）」一组。
-  - 取舍与那条邻居样式表冲突的处置 → [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)。
+  - 取舍与那条全局对话框样式表冲突的逐条处置 → [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)。
 - 金额一律按字符串处理，只用 `../model.ts` 的 `formatMoney` / `formatAmount`。
   - 禁止 `parseFloat` 后比较或累加；相等与累加都在后端。
 - **形态从处境派生，本目录不做形态判断**：环 / 中心记号 / 文案一次

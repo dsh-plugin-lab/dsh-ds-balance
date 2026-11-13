@@ -113,7 +113,14 @@
   `pnpm run check:declaration`），**不抄进本文**。
 - [ ] 六条待产品决策的默认值 → [决策记录](.agents/notes/2026-09-17-implementation-deviations.md) 末节
 - [ ] 阶段 7 交付清单：截图 / 录屏需维护者配合
-- [ ] **浮层图标行为变了 → 涉及它的门面截图需重拍**（`sidebar-popover*.png`）：判据见 [assets/AGENTS.md](assets/AGENTS.md)
+- [ ] **浮层定位变了（JS 钩子 → CSS 锚点）→ 涉及浮层的门面截图需复核**（`sidebar-popover*.png`）：
+  几何关系应当不变（向上展开、间距 8、左缘对齐），但**位置是另一套机制算出来的**，别默认老图还准。
+  判据见 [assets/AGENTS.md](assets/AGENTS.md)；改动缘由见[决策记录](.agents/notes/2026-11-13-css-anchored-popover.md)。
+- [ ] **≤520px 宽时浮层会被另一个插件的抽屉盖住（几何正确、看不见）**：那是对方用全局
+  `[role="dialog"]` 选择器 + `z-index: 1310` 改写页面造成的，已向它的仓库报 issue；
+  本仓**故意不**把自己抬到 1100 以上（那是官方浮层档位）。对方的 issue 关掉之后，
+  可把 [BalancePopover.module.css](src/client/sidebar/BalancePopover.module.css) 里那批
+  `!important` 与 `<section>` 包裹层一起退回，并同批改红线。细节见[决策记录](.agents/notes/2026-11-13-css-anchored-popover.md)。
 - [ ] 本机 profile 升到含本轮计时修复的那一版后实机验收：浮层冷却从冷却值本身开始倒数（不再从 N+1）、
   按钮在截止时刻就能按、点刷新一定真的打一次上游
 - [ ] `node scripts/acceptance.mjs` 的**上游那一段**（要真实 `DEEPSEEK_API_KEY`）：本轮发布前只跑了离线四项，退出码 2

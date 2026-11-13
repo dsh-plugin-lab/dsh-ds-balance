@@ -1423,20 +1423,23 @@ describe('浮层定位（CSS 锚点）', () => {
     expect(valueOf(panelCss, PANEL_SELECTOR, 'position-anchor')).toBe(anchorName)
   })
 
-  it('尺寸四条必须能压过邻居那条全局 [role="dialog"] 规则（它是 !important 的）', () => {
-    // 本机 profile 里的 dsh-console-plugin（实测 0.5.73）注入 `dsh-console-narrow-css`：
+  it('尺寸几条必须能压过「另一个插件全局改写 [role="dialog"]」的那条规则（它是 !important 的）', () => {
+    // 某个已装第三方插件会注入一张「手机版」样式表：
     // `@media (max-width: 520px) { [role="dialog"] { width: 100vw !important;
     // height: 100vh !important; max-width: none !important; max-height: none !important; … } }`
-    // —— 命中的是页面上**每一个** dialog，于是 ≤520px 宽时我们的浮层被撑成整屏、
-    // 锚点定位被顶出视口（480×800 实测 rect = [12, -297, 480, 800]）。
+    // —— 命中的是页面上**每一个** dialog（`role="dialog"` 是别人的无障碍语义，谁都会用），
+    // 于是 ≤520px 宽时我们的浮层被撑成整屏、锚点定位被顶出视口
+    // （480×800 实测 rect = [12, -297, 480, 800]）。
     // 带 `!important` 的声明只与同样带 `!important` 的比，再比特异性：`.panel` (0,1,0)
     // 与 `[role="dialog"]` 同分，同级只看源码顺序（归模块加载与 HMR 管，靠不住），
-    // 所以两条一起用：`section.panel` 抬特异性 + 尺寸四条自己带 `!important`。
+    // 所以两条一起用：`section.panel` 抬特异性 + 尺寸几条自己带 `!important`。
     // 谁把 `!important` 当噪音删掉，这条会红 —— 那是别家缺陷的绕行，不是我们的洁癖。
+    // **只认选择器形状，不记对方的名字**（它会换，也不是我们的依赖）。
     for (const [property, expected] of [
       ['width', 'max-content'],
       ['height', 'auto'],
       ['max-width', 'min(440px, calc(100vw - 24px))'],
+      ['padding', '16px'],
     ] as const) {
       expect(valueOf(panelCss, PANEL_SELECTOR, property), property).toBe(`${expected} !important`)
     }
