@@ -19,11 +19,13 @@
 - 职责：条目全部行为 —— 场景订阅、**币种选择**（浮层的「改用 X」直接写设置作用域的 `displayCurrency`，与设置卡片共用同一条写路径，见 [决策记录](../../../.agents/notes/2026-09-19-currency-single-source.md)）、点击开关浮层、**展开态悬浮条目报出余额金额**、刷新模拟与冷却、Escape 与外部点击关闭。
 - 关键导出：`SidebarBalance`（本目录唯一对外组件）、`SidebarBalanceProps`（`wide` / `t` / `config` / `configSlotProbe`）。
 - `configSlotProbe` 由 [../index.tsx](../index.tsx) 建好后经 props 传进来，本目录只订阅它的三态（`useConfigSlotState`）；**提示必须可撤销**，所以订阅而不是读一次。
-- **悬浮气泡只挂展开态**：整条按钮包一层官方 `Tooltip`，内容是「Balance 那一条」的金额（`formatMoney`，与浮层第一行同源），标题 / 赠送充值拆分 / 状态解释都不加；底色用原语自带的 `--dsw-alias-tooltip-bg`，**不许自绘黑底**（字面色值红线，自绘也会跟主题脱节）。没有金额时回落到状态文案，两者都没有就不挂 —— 不留空气泡。
-  折叠态（rail）**不挂**：那里已经由 `PercentRing` 的原生 `title` 承担同一件事，再叠一层就是两层提示。
+- **悬浮气泡两态都挂，锚是整条按钮**：整条触发按钮包一层官方 `Tooltip`，内容是 `../situation.ts` 的 `hoverTextOf`（数字可信报金额，否则报这个处境自己的文案），标题 / 赠送充值拆分 / 状态解释都不加；底色用原语自带的 `--dsw-alias-tooltip-bg`，**不许自绘黑底**（字面色值红线，自绘也会跟主题脱节）。`hoverText` 为空时不包这一层 —— 不留空气泡。
+  **命中区跟着按钮走，不是跟着图形走**：展开态 44px 整行、折叠态 36×36 命中区，悬浮灰底覆盖到哪里就弹到哪里。
+  折叠态从前挂的是 `PercentRing` 的 24px SVG 原生 `title` —— 原生 title 的命中面**就是那个 `<svg>`**，
+  于是按钮边缘那圈有灰底却不弹，同一块悬浮区内圈外圈不一致（见 [决策记录](../../../.agents/notes/2026-11-14-hover-hit-area-is-the-button.md)）。
 - **同一时刻只允许一个气泡**：标记（感叹号）那层 `Tooltip` 嵌在外层里，原语用 `TooltipSuppression` 上下文让内层可见时压掉祖先；**浮层已打开时外层 `disabled`**（面板里就有这份数据，且指针通常还停在条目上）。动这两层包装要实机复核。
 - 被谁依赖：[../index.tsx](../index.tsx) 的 `SidebarSeatComponent`。
-- 改后必测什么：展开态（圆环 + 标签）与折叠态（36×36 圆环）都可见；**折叠态的悬浮背景与上方官方条目同为 12px 圆角（不是正圆）**；点条目开浮层、Escape 与外部点击关；`aria-expanded` 跟随开合；**点上方邻居条目要落到邻居身上**；展开态悬浮出气泡且只报金额、**指针停在感叹号上只有一个气泡**、浮层打开时不出气泡、折叠态不挂 Tooltip。
+- 改后必测什么：展开态（圆环 + 标签）与折叠态（36×36 圆环）都可见；**折叠态的悬浮背景与上方官方条目同为 12px 圆角（不是正圆）**；点条目开浮层、Escape 与外部点击关；`aria-expanded` 跟随开合；**点上方邻居条目要落到邻居身上**；两态悬浮出**同一句话**的气泡、**指针停在感叹号上只有一个气泡**、浮层打开时不出气泡；**折叠态停在按钮边缘（圆环之外、命中区之内）也要出气泡**，且两态 DOM 里都没有 SVG 原生 `<title>`（`test/hover-parity.test.ts` 两条结构性断言）。
 
 ### SidebarBalance.module.css
 
@@ -72,14 +74,15 @@
 ### PercentRing.tsx
 
 - 职责：折叠与展开**共用**的状态圆环；弧长是「余额 / `warn` 阈值」的比例，颜色只表达状态。
-- 关键导出：`PercentRing`、`PercentRingProps`（`state` / `marker` / `ratio` / `size` / `title`）、`RingState`、`RingMarker`。
+- 关键导出：`PercentRing`、`PercentRingProps`（`state` / `marker` / `ratio` / `size`）、`RingState`、`RingMarker`。
 - `marker` 是中心记号，两个取值：`'cross'`（斜交 —— 读不到）与 `'plus'`（正交 —— 待配置）。
   两者**几何同源**：同一个 `MARK_ARM`（= 内半径 / 2 / √2）、外接框逐值相等，只差 45° 朝向，
   所以灰度 / 色盲 / 12px 下都分得开，不靠颜色。改了记号必须同批改红线里那两条几何断言。
 - 被谁依赖：`SidebarBalance.tsx`，两个形态都用它；形态由 [../situation.ts](../situation.ts) 的
   形态表给出，弧长由 [../model.ts](../model.ts) 的 `ringRatioOf` 给出。
 - **几何分两处照官方，不是整份照抄同一个文件**：网格与笔画照左栏那批图标（`viewBox="0 0 16 16"`、笔画 1 = 宿主 `ui-primitives/src/icons/index.tsx:21` 的 `ICON_REGULAR_STROKE`），弧的读法照官方 `ContextMeter`（宿主 `packages/client/ui-conversation/src/client/skeleton/ContextMeter.tsx:117-127`）。圆心 (8,8)、`r=6.5`（与官方 `ContextMeter` 同一个公式：边长/2 − 圆留白 − 笔画/2）：墨迹外径 14 落在 16 的格里、四周各留 1，与官方字形 12–13.75 的墨迹跨度同档（另加一格容差，见红线）。
-- 改后必测什么：四档 `state` 各自的颜色；`ratio` 为 0 时 svg 里没有 `.fill` 那条弧、为 1 时是满环；`cross` 与 `plus` 各恰好两条 `<line>`；svg 自身的 `aria-hidden` 仍在（语义由外层 `aria-label` 承担）；折叠态的 `title` 只在有状态文案时出；**弧的接缝仍在 12 点** —— 靠 `transform="rotate(-90 8 8)"`（圆心跟着 `VIEW` 走），**不是 `stroke-dashoffset`**（换成 dashoffset 会把接缝挪回 3 点）。
+- **不带悬停提示**：提示挂在外面那条触发按钮上（`SidebarBalance` 的官方 `Tooltip`），锚是按钮的命中区而不是这个 24px 图形 —— 环若自己挂 SVG 原生 `<title>`，按钮边缘那圈有悬浮灰底却没有提示。
+- 改后必测什么：四档 `state` 各自的颜色；`ratio` 为 0 时 svg 里没有 `.fill` 那条弧、为 1 时是满环；`cross` 与 `plus` 各恰好两条 `<line>`；svg 自身的 `aria-hidden` 仍在（语义由外层 `aria-label` 承担）；**弧的接缝仍在 12 点** —— 靠 `transform="rotate(-90 8 8)"`（圆心跟着 `VIEW` 走），**不是 `stroke-dashoffset`**（换成 dashoffset 会把接缝挪回 3 点）。
 
 ### PercentRing.module.css
 

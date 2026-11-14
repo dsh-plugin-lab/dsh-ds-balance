@@ -96,7 +96,7 @@ The ring itself is "what is going on right now", five states you can tell apart 
 | Arc length | The balance as a share of that currency's **warning threshold**, capped at a full circle |
 | Colour | State only (normal / low / critical), never the amount; the **critical threshold only sets the colour** and takes no part in drawing the ring |
 | The mark in the middle | **+** means not connected yet; go configure; **cross** means no usable number here — it could not be read, or it was read but the account cannot be used |
-| Hover text | The **amount** when the number is trustworthy, that state's own line otherwise; collapsed and expanded say the same sentence |
+| Hover text | The **amount** when the number is trustworthy, that state's own line otherwise; collapsed and expanded say the same sentence, and anywhere on the button shows it |
 | The source bracket | To the right of the popover title: which credential this number came from — a head-and-tail mask such as `sk-cf08d*****3b84`, or the signed-in account's name |
 | Data freshness | The "how long ago" in the popover, counted from the moment the data arrived |
 | Manual refresh | Cooldown applies; the cooldown restarts when the refresh finishes, and the seconds on the popover are the real ones left |

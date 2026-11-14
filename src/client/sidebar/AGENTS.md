@@ -17,6 +17,14 @@ sidebar/ 特有约束：
   完整事故见 [postmortem](../../../docs/postmortem/2026-09-17-aria-haspopup-neighbour-collision.md)。
 - 折叠与展开**共用同一个 `PercentRing`**，不许出现形态切换。
   - 即：侧栏开合时图标不能从一种图形换成另一种，两态只能相差尺寸。
+- 悬停提示的锚**必须是那条触发按钮**，不许挂在图标上，也不许给 `PercentRing` 加 `title`。
+  - 理由：原生 `<title>` 的命中面**就是承载它的那个元素** —— 挂在 24px 的 `<svg>` 上时，
+    36×36 按钮边缘那圈（有悬浮灰底、看得出可悬停）什么都不弹，同一块悬浮区内圈外圈不一致。
+  - 落地：两态都包官方 `Tooltip`（展开 44px 整行 / 折叠 36×36 命中区），只差 `side`；
+    `PercentRing` 因此**没有** `title` prop —— 谁都别再把它加回来（那会变成两层提示）。
+  - 判据：`test/hover-parity.test.ts` 的两条结构性断言（气泡的直接子元素是 `<button>`；
+    两态都不出现 `<title>`），渲真组件跑。
+  - 缘由与被否决的改法见[决策记录](../../../.agents/notes/2026-11-14-hover-hit-area-is-the-button.md)。
 - 浮层**关闭态必须是卸载**（`{open ? createPortal(...) : null}`），不许留下任何可命中区域。
   - 理由：面板是 `position: fixed` 的大盒子，若留在 DOM 里会参与命中测试并盖住邻居。
 - 浮层只经 `createPortal` 挂到 `document.body`，外部点击判定必须传第 4 个参数 `panelRef`。
