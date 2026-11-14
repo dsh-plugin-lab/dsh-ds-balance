@@ -42,6 +42,7 @@
 - `configSlotWarning` 非 null 时复用既有的 `notice` / `noticeText` 渲染一行英文 `[WARN]`（无动作按钮、无新增样式）。
 - 标题行是外链：`https://platform.deepseek.com/usage`，`target="_blank"` + `rel="noopener noreferrer"`，新标签页打开官网用量页；文字带下划线但**颜色 `inherit`**（宿主没有「链接色」这类语义 token，硬套会破配色纪律），图标是 svg、不吃 `text-decoration`。
 - **标题行右端的 Plugins 图标按钮**：无可见文字，`aria-label` 与 tooltip **逐字同源**（同一个 `pluginsLabel`）；图标 `IconPluginPinwheelOutlineRegular` 与宿主侧栏 Plugins 条目同字形（图标按**笔画粗细**分 `Regular` / `Medium`，尺寸走 `size` prop），样式逐值照抄宿主 `.iconButton`（28×28、圆角 `var(--dsw-radius-sm)` —— **裸引，不写回落**：声明的那条线上该 token 一定存在，换线前它才带 `50%` 回落；不写 `corner-shape`，继承宿主全局 superellipse；hover 用 `--dsw-alias-interactive-bg-hover`），并显式 `cursor: pointer`（浮层面板自己写了 `cursor: default`）。点它跳转并**关闭浮层**。
+  - **一处有意不分道的地方：不给它负外边距**。宿主那处（`sidebar-files` 的信息按钮）用 `margin-block: -2px` 把 28px 控件压回 18px 文字行，**因为那边不纵向滚动**；浮层的标题行在 `.body` 里，而 `.body` 是 `overflow-y: auto` —— 负外边距会把控件顶到行盒之外、被裁掉，表现是悬停时灰底顶部缺一条。所以这里让行就是 28px，多出的 10px 由 `.panel` 顶边距（11px）与 `.title` 下边距（3px）吸收，见 [BalancePopover.module.css](#balancepopovermodulecss)。
 - **落点是两档，措辞跟着分档**（`PluginsAction.reachesConfig`，由 [../index.tsx](../index.tsx) 的 `createPluginsNavigation` 按**服务在不在**给出）：
   ① 宿主 provide 了跨插件深链服务 `pluginNavigation.openBundle(包名)` 时**直达本插件的配置格**，话术是「打开插件配置页」；
   ② 服务缺席（更早的宿主线）或深链抛错时退回 `ctx.layout.selectPanel('plugins')` 的 **Plugins 列表页**，话术跟着退回「打开插件页」。
@@ -60,11 +61,13 @@
   - 选择器是 `section.panel`、尺寸几条带 `!important`：为了压过**另一个已装插件**注入的那张 ≤520px「手机版」样式表（它用全局 `[role="dialog"]` 选择器，把页面上**每一个**对话框都撑成整屏）。识别判据是**那条规则的选择器形状**，仓内不记对方的插件名。
   - **`.body` 是 `<section>` 不是 `<div>`**：同一张样式表对 `[role="dialog"] > div` 写了一串 `!important`（overflow hidden、最末一个 div 自己滚），换成非 div 就一条都不命中。
 - **滚动在 `.body` 上、不在 `.panel` 上**：材质层是 `.panel::before` 的 `inset: 0` 绝对定位伪元素，放进滚动容器会跟着内容滚走，滚动后下半截就没有填充与磨砂。官方 `Menu` 同一结构（卡片不滚、内部 `.viewport` 滚）。
+- **`.body` 是滚动容器 ⇒ 它里面的控件不许探出自己那一行**：`overflow-y: auto` 会裁掉越界内容，负外边距在这里不是「压缩行高」而是「被切掉一截」。标题行因此是 28px（右端那个图标按钮撑的），多出的 10px 由 `.panel` 顶边距 `11px` 与 `.title` 下边距 `3px` 吸收 —— `11 + 5 = 16`、`3 + 5 = 8`，与官方 stat-dialog 的 16 / 8 逐值等价，基线不动。
+  - 判据：`test/redlines.test.ts` 的「滚动容器里的控件不许用负外边距探出行外」一条（含反向控制：那两个控件确为 28px、面板行高确为 18px）。
 - **材质分两层，别合回一层**：`.panel` 只留 `isolation: isolate` / `z-index` / 圆角 / `box-shadow` 与描边重绑；半透明填充与 `backdrop-filter: var(--dsw-menu-backdrop-filter)` 画在 `.panel::before` 上。理由两层：
   ① 官方规范要求写 `--dsw-specific-menu` 的表面在同一条规则里配那条滤镜（官方把菜单材质拆成了这两条 token）；
   ② 滤镜非 `none` 的元素会成为 fixed 后代的包含块，而本面板内部有两个**非 portal** 的 Tooltip 气泡（Plugins 图标与刷新按钮）——写在 `.panel` 上会让它们按视口算好的坐标变成相对面板的偏移，气泡直接跑出屏幕。
 - 被谁依赖：`BalancePopover.tsx`。
-- 改后必测什么：宽度三行（`max-content` + 上下界都随视口收缩）在窄窗口下不溢出；**360 / 480 / 600 / 700 / 721 五个宽度下面板 rect 都落在视口 12px 内边距里**（真机量，见 [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)）；浮层底边与触发行上缘正好差 8px；标题与明细之间只有一条分隔线；亮暗两色下文字仍可读；**悬停右上角 Plugins 图标与右下角刷新按钮时，气泡仍紧贴各自的按钮**（材质层回归判据，它同时证明 `.panel` 上没有滤镜）；**面板背后有内容时看得出模糊**。
+- 改后必测什么：宽度三行（`max-content` + 上下界都随视口收缩）在窄窗口下不溢出；**360 / 480 / 600 / 700 / 721 五个宽度下面板 rect 都落在视口 12px 内边距里**（真机量，见 [决策记录](../../../.agents/notes/2026-11-13-css-anchored-popover.md)）；浮层底边与触发行上缘正好差 8px；标题与明细之间只有一条分隔线；亮暗两色下文字仍可读；**悬停右上角 Plugins 图标与右下角刷新按钮时，气泡仍紧贴各自的按钮**（材质层回归判据，它同时证明 `.panel` 上没有滤镜）；**面板背后有内容时看得出模糊**；**悬停那两个图标按钮时灰底四边完整**（顶部不缺一条 —— 那是控件探出行外被 `.body` 裁掉的形态，见上一条）；标题文字与分隔线的间距与官方 stat-dialog 看起来一致。
 
 ### PercentRing.tsx
 

@@ -133,6 +133,9 @@
   账户不可用 / 数据已过期 / 暂无余额」。**注意 `stale` 与 `account-unavailable` 有数字也显文案**。
   mock 逐形态一眼过用 `?dsb=<处境键>`（**11 个处境全造得出来**，含 `checking` / `offline`；
   见 [docs/UI-HANDOFF.md](docs/UI-HANDOFF.md) §八）
+- [ ] **实机看一眼这处几何改动**：浮层右上角图标按钮悬停时**灰底四边完整**（顶部不再缺一条），
+  标题文字与下方分隔线的间距看着与官方「用量」浮层一致；右下角刷新按钮的墨色与标题行那枚同深。
+  判据与算式见[决策记录](.agents/notes/2026-11-14-popover-row-height-absorbs-control.md)
 
 ## 活跃坑
 
