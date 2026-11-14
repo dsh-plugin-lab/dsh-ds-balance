@@ -67,8 +67,13 @@ section.panel {
   min-width: min(300px, calc(100vw - 24px));
   max-width: min(440px, calc(100vw - 24px)) !important;
   /* 内边距与圆角同样是邻居那条 `padding: 0 !important; border-radius: 0 !important` 的目标：
-     不 override 的话 ≤520px 下内容贴边、四个角变直角，材质层（::before 继承圆角）也跟着方掉。 */
-  padding: 16px !important;
+     不 override 的话 ≤520px 下内容贴边、四个角变直角，材质层（::before 继承圆角）也跟着方掉。
+     **顶部是 11px 不是 16px**：标题行被右端那个 28px 图标按钮撑成 28px（官方那一行是 18px 纯文字），
+     上下各多 5px。这 5px 只能从面板自己的顶边距里让出来 —— 用负外边距把它压回 18px 的话，
+     探出的那 5px 会越过 `.body` 的边界被 `overflow-y: auto` 裁掉（悬停时灰底的顶部缺一块）。
+     11 + 5 = 16，所以标题文字的基线、以及与下方分隔线的间距（3 + 5 = 8）与官方 stat-dialog
+     逐像素同位；左右与底部保持 16px —— 那里没有比内容更高的控件。 */
+  padding: 11px 16px 16px !important;
   /* 定位用的是 bottom，所以这里不能有默认外边距（浏览器给 section 的 margin 会加进偏移）。 */
   margin: 0;
   border: 0;
@@ -153,7 +158,10 @@ section.panel {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 8px;
+  /* 3px 而不是官方那 8px：这一行现在是 28px 高（右端的图标按钮），文字只在中间那 18px 里，
+     上下多出的 5px 各由「面板顶边距 11px」与「这条 3px」吸收 —— 3 + 5 = 8，
+     所以文字与下方分隔线的距离仍与官方 stat-dialog 逐像素相同。 */
+  margin-bottom: 3px;
   color: var(--dsw-alias-label-primary);
   font-weight: 500;
 }
@@ -221,9 +229,11 @@ section.panel {
    **不写 corner-shape**：宿主 ui-theme 已给 `*` 配了 var(--dsw-corner-shape)
    （superellipse(1.5)），写 round 会把它掰回 superellipse(1)、与官方不一致
    （同 SidebarBalance.module.css 的既有结论）。
-   margin-block 是**为我们的结构补的**：本组件用的是 18px 行高的标题行，官方那一行也是 18px，
-   而这个按钮 28px 会把行撑成 28px（分隔线与面板节奏跟着偏）。负外边距 = (28 − 18) / 2 = 5px，
-   把行高还给 18px —— 实测标题行高 18.00、左中右三者中线偏移全部 0.00。 */
+   **不给它负外边距**（这一条与官方那处「用负外边距把行高压回文字行高」的做法分道，理由在下）：
+   它 28px、而这一行的文字只有 18px，看上去该用 (28 − 18) / 2 = 5px 的负外边距把行高还给 18px ——
+   但负外边距会把按钮顶到行盒之外，而这一行在 `.body`（滚动容器）里面，`overflow-y: auto`
+   会把越界的 5px 裁掉，表现是**悬停时灰底顶部缺一条**。所以改成「行就是 28px，那 5px 由
+   `.panel` 的顶边距与 `.title` 的下边距吸收」（见那两条规则），控件永远留在自己的盒子里。 */
 .iconButton {
   position: relative;
   flex: none;
@@ -232,7 +242,6 @@ section.panel {
   justify-content: center;
   width: 28px;
   height: 28px;
-  margin-block: -5px;
   border: none;
   border-radius: var(--dsw-radius-sm);
   padding: 0;
@@ -323,7 +332,10 @@ section.panel {
 
 /* 底部刷新按钮：官方 stat-dialog 里没有对应物（它没有底部动作行），
    所以这里**有意偏离** —— 但走同一族的约定：与标题行那个 .iconButton 同为 28×28 图标按钮，
-   圆角同样取 --dsw-radius-sm，不写 corner-shape（理由同上）。 */
+   圆角同样取 --dsw-radius-sm，不写 corner-shape（理由同上）。
+   **静止色与标题行那枚一致取 secondary**：同一个浮层里两个同形图标按钮不该有两种墨色，
+   而宿主侧栏的 .iconButton（这一族的出处）静止态也是 secondary —— 从前这里是 tertiary，
+   于是两枚按钮深浅不一。 */
 .refresh {
   display: inline-flex;
   flex: none;
@@ -335,13 +347,13 @@ section.panel {
   border: none;
   border-radius: var(--dsw-radius-sm);
   background: transparent;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
 }
 
+/* 悬停只换底、不换墨色：官方侧栏那条 .iconButton:hover 也只改 background。 */
 .refresh:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-secondary);
 }
 
 .refresh:focus-visible {
