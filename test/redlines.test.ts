@@ -1472,7 +1472,10 @@ describe('浮层定位（CSS 锚点）', () => {
       ['width', 'max-content'],
       ['height', 'auto'],
       ['max-width', 'min(440px, calc(100vw - 24px))'],
-      ['padding', '16px'],
+      // 顶部 11px：标题行被那个 28px 图标按钮撑成 28px，比官方的 18px 文字行高 10px，
+      // 那 5px 从面板顶边距里让出来（11 + 5 = 16，基线因此与官方 stat-dialog 同位）。
+      // 改回 16px 会把整行下推 5px，同批要看「标题行里控件不许探出」那一条。
+      ['padding', '11px 16px 16px'],
     ] as const) {
       expect(valueOf(panelCss, PANEL_SELECTOR, property), property).toBe(`${expected} !important`)
     }
@@ -1505,6 +1508,52 @@ describe('浮层定位（CSS 锚点）', () => {
     expect(valueOf(panelCss, PANEL_SELECTOR, 'overflow-y')).toBeUndefined()
     expect(valueOf(panelCss, '.body', 'overflow-y')).toBe('auto')
     expect(valueOf(panelCss, '.body', 'min-height')).toBe('0')
+  })
+
+  /**
+   * `.body` 是滚动容器，所以它里面的控件**不许用负外边距探出自己那一行**。
+   *
+   * 为什么单列一条：`overflow-y: auto` 的盒子会裁掉越界内容，而这一族控件天生诱人用负外边距 ——
+   * 28px 的图标按钮放进 18px 的文字行，最顺手的写法就是 `margin-block: -5px`（宿主自己在文件树
+   * 里就这么写，因为那边**不纵向滚动**）。搬进浮层就变成「悬停时灰底顶部缺一条」：按钮盒探到
+   * `.body` 之上 5px，被裁掉的正好是那段灰底。编译、类型检查、别的测试全绿，只有真人悬停看得见。
+   *
+   * 现在的解法是把那 5px 从面板顶边距（`11px`）与 `.title` 的下边距（`3px`）里让出来：
+   * 11 + 5 = 16、3 + 5 = 8，与官方 stat-dialog 的 16 / 8 逐值等价。
+   */
+  it('滚动容器里的控件不许用负外边距探出行外（那 5px 会被裁掉）', () => {
+    /** `.body` 里可能被塞进高控件的那些行。 */
+    const inner = [
+      '.title',
+      '.titleMain',
+      '.titleLabel',
+      '.sourceLabel',
+      '.iconButton',
+      '.details',
+      '.footer',
+      '.refresh',
+    ]
+    const blockMargins = ['margin', 'margin-block', 'margin-block-start', 'margin-top']
+    const offenders: string[] = []
+    for (const rule of parseCssRules(panelCss)) {
+      const selector = rule.selectors.find((one) => inner.includes(one))
+      if (selector === undefined) continue
+      for (const [property, value] of rule.declarations) {
+        if (!blockMargins.includes(property)) continue
+        if (/(^|\s)-[\d.]/.test(value)) offenders.push(`${selector} { ${property}: ${value} }`)
+      }
+    }
+    expect(
+      offenders,
+      `这些控件探出了自己那一行，越界部分会被 .body 裁掉：\n${offenders.join('\n')}`,
+    ).toEqual([])
+    // 反向控制：这一族控件确实在、确实是「28px 控件 + 18px 行高」这个诱人的比例，
+    // 否则上一条会退化成「文件里根本没有这两条规则」式的假绿。
+    expect(valueOf(panelCss, '.iconButton', 'height')).toBe('28px')
+    expect(valueOf(panelCss, '.refresh', 'height')).toBe('28px')
+    expect(valueOf(panelCss, PANEL_SELECTOR, 'line-height')).toBe('18px')
+    // 那 5px 的落点也钉住：顶 11 + 行内 5 = 16、下 3 + 行内 5 = 8。
+    expect(valueOf(panelCss, '.title', 'margin-bottom')).toBe('3px')
   })
 
   it('组件侧不许自己量矩形算坐标（定位是 CSS 的事）', () => {

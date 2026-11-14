@@ -288,6 +288,9 @@ export function BalancePopover(props: BalancePopoverProps): JSX.Element {
               type="button"
               className={css.refresh}
               aria-label={refreshLabel}
+              // 刷新中要能被读屏听出来：`disabled` 只表达「按不动」，不表达「正在做」。
+              // 官方 Plugins 页的刷新按钮同样带 `aria-busy`（ui-plugin-manager 的 refresh 按钮）。
+              aria-busy={refreshing || undefined}
               // 冷却期内也算不可用：点了不会发请求，按钮就该灰着，而不是只换一行文字。
               disabled={refreshing || cooling}
               data-refreshing={refreshing || undefined}
