@@ -153,238 +153,50 @@ describe('插件清单', () => {
  */
 describe('发布流程', () => {
   /**
-   * 在一份 YAML 里找**命令位置**上的改写版本调用。
-   * 只看命令位置（行首、`run:` 之后、`&&` / `;` 之后）—— 提示文案里写「bump with: npm version …」
-   * 是给维护者看的一句话，不是调用，不该被误伤。
-   */
-  const bumpCalls = (text: string): string[] =>
-    text.split('\n').flatMap((line, index) => {
-      const body = line.replace(/^\s*(?:-\s*)?(?:run:\s*)?/, '')
-      return body
-        .split(/&&|;|\|\|/)
-        .map((part) => part.trim())
-        .filter((part) => /^(?:npm|pnpm)\s+(?:--?[\w-]+\s+)*version(?:\s|$)/.test(part))
-        .map((part) => `第 ${index + 1} 行：${part.slice(0, 60)}`)
-    })
-
-  it('release.yml 里不得出现改写版本的调用', () => {
-    // bump 是发布**之前**的独立一步（在维护者机器上跑），workflow 只发不 bump。
-    // 判据与顺序的说明在 docs/PUBLISHING.md；反向控制在同一组的下一条。
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    const found = bumpCalls(workflow)
-    expect(found, `release.yml 里出现了改写版本的调用：\n${found.join('\n')}`).toEqual([])
-  })
-
-  it('上面那条检测器有牙齿（反向控制）', () => {
-    // 防空转：扫不到东西的守卫等于没有守卫。
-    expect(bumpCalls('      - run: npm version patch --no-git-tag-version')).toEqual([
-      '第 1 行：npm version patch --no-git-tag-version',
-    ])
-    expect(bumpCalls('run: pnpm version minor')).toEqual(['第 1 行：pnpm version minor'])
-    expect(bumpCalls('        npm --no-git-tag-version version prerelease')).toEqual([
-      '第 1 行：npm --no-git-tag-version version prerelease',
-    ])
-    expect(
-      bumpCalls(
-        'run: pnpm install --frozen-lockfile --config.node-linker=hoisted && npm version patch',
-      ),
-    ).toEqual(['第 1 行：npm version patch'])
-    // 正常的发布步骤、以及提示文案里的那串字，都不该被误伤。
-    expect(bumpCalls('run: pnpm install --frozen-lockfile --config.node-linker=hoisted')).toEqual(
-      [],
-    )
-    expect(bumpCalls('run: npm publish --provenance --tag "$tag"')).toEqual([])
-    expect(bumpCalls('run: pnpm run build && pnpm test')).toEqual([])
-    expect(
-      bumpCalls('echo "bump with: npm version <patch|minor|major> --no-git-tag-version"'),
-    ).toEqual([])
-  })
-
-  /**
-   * 发布面 **git 侧产物**的形状：三件事各自可判，也各自可反向控制。
-   * 为什么连形状都要断言：tag 名不是给人看的 —— 守卫靠 `git describe --match 'v[0-9]*'` 读它
-   * （zhihu 那边就因为版本号换了来源、`v` 前缀丢了，让守卫**看不见**新 tag）；
-   * 而 Release 漏建过一次（1.0.0 / 1.1.0 是手工补的），靠的是**人记得**。
-   */
-  const releaseShape = (text: string) => {
-    const tagAssignments = [...text.matchAll(/\btag="([^"]*)"/g)].map((m) => m[1])
-    return {
-      createsRelease: /(?:^|\s)gh release create\s/.test(text),
-      tagAssignments,
-      oddPrefix: tagAssignments.filter((value) => !value.startsWith('v')),
-      // 预发布段（`*-*`）与 `--prerelease` 必须成对：只写后者 = 正式版也会被标成预发布。
-      prereleaseGuarded: /\*-\*/.test(text) && text.includes('--prerelease'),
-    }
-  }
-
-  it('git 侧两样产物都由流程产出：v 前缀的 tag + 预发布标 --prerelease 的 Release', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    const shape = releaseShape(workflow)
-    expect(
-      shape.createsRelease,
-      'release.yml 里没有建 Release 的步骤：那样每发一次版都要靠人记得补',
-    ).toBe(true)
-    expect(shape.tagAssignments.length, 'release.yml 里找不到 tag 赋值').toBeGreaterThan(0)
-    expect(shape.oddPrefix, `tag 名必须是 v 前缀，出现：${shape.oddPrefix.join('、')}`).toEqual([])
-    expect(shape.prereleaseGuarded, '版本带预发布段时没有走 --prerelease').toBe(true)
-  })
-
-  it('上面那条形状判据有牙齿（反向控制）', () => {
-    // 少 v：换了版本号来源、前缀丢了 —— 守卫看不见这种 tag。
-    expect(releaseShape('          tag="${{ steps.probe.outputs.version }}"\n').oddPrefix).toEqual([
-      '${{ steps.probe.outputs.version }}',
-    ])
-    // 有 --prerelease，却没有「按版本预发布段判定」那一步 → 正式版也会被标成预发布。
-    expect(releaseShape('run: gh release create "$tag" --prerelease\n').prereleaseGuarded).toBe(
-      false,
-    )
-    // 只打 tag、不建 Release（这就是 2026-09-22 之前的样子）。
-    expect(releaseShape('run: git tag "$tag" && git push origin "$tag"\n').createsRelease).toBe(
-      false,
-    )
-    // 正面样本：真东西那个形状三样都得true。
-    expect(
-      releaseShape(
-        [
-          '          tag="v${{ steps.probe.outputs.version }}"',
-          '          case "${{ steps.probe.outputs.version }}" in',
-          '            *-*) flags="--prerelease" ;;',
-          '          esac',
-          '          gh release create "$tag" --title "$tag" $flags --generate-notes',
-        ].join('\n'),
-      ),
-    ).toEqual({
-      createsRelease: true,
-      tagAssignments: ['v${{ steps.probe.outputs.version }}'],
-      oddPrefix: [],
-      prereleaseGuarded: true,
-    })
-  })
-
-  /**
-   * 正文来源两级（草稿 → 回落）与**「草稿真的被读到了吗」那条断言**。
+   * 判据：**发布链是共享的**，本仓的 `release.yml` 只是薄壳（组织判据 `release-caller-intact`）。
    *
-   * 为什么连这个都要钉：读不到草稿与「草稿为空」都会走回落，但前者是**配置坏了**
-   * （tag 改名、action 没跑、权限不足），后者是**正常情况**。不区分的话，
-   * 「发版成功但正文其实走了回落」是**静默失败** —— 结果看着对，实际少了一层。
-   */
-  it('发版正文走「草稿 → --generate-notes 回落」，且两级都在', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    // 读草稿：必须点名滚动 tag，不能是 v<版本>（否则会命中存在性判断）。
-    expect(workflow, '没有读 Release Drafter 草稿的步骤').toContain('gh release view next')
-    // 回落仍在。
-    expect(workflow, '回落那一路没了').toContain('--generate-notes')
-    // **断言在位**：草稿读不到时必须发 warning，而不是静默回落。
-    expect(workflow, '草稿读不到时没有 warning —— 那就成了静默回落').toMatch(
-      /warning::读不到 Release Drafter 草稿/,
-    )
-    // 两条路各自传给 gh release create。
-    expect(workflow).toContain('--notes-file /tmp/notes.md')
-  })
-
-  it('上面那条判据有牙齿（去掉断言就该被抓出来）', () => {
-    // 反向控制：拿一份「只回落、不读草稿」的假 workflow 去比对，必须不满足。
-    const noDraft = 'run: gh release create "$tag" --title "$tag" $flags --generate-notes\n'
-    expect(noDraft).not.toContain('gh release view next')
-    // 拿一份「读草稿但读不到时静默」的假 workflow，warning 那条必须不命中。
-    const silent = 'draft="$(gh release view next --json body --jq .body)"\n'
-    expect(silent).not.toMatch(/warning::读不到 Release Drafter 草稿/)
-  })
-
-  /**
-   * 发完**删草稿**。
+   * 为什么行为断言搬走了：两个入口、tag 形状、草稿的读与删、守卫基线排除、事件守卫、不改版本号 ——
+   * 这些判的本来是**真正执行的那份文件**。薄壳里没有那些步骤，同样的断言留在这里就变成
+   * 「因为没有东西可读所以绿」，比红更坏。它们现在在组织仓的 `scripts/lib/release-flow.mjs`，
+   * 由 `check-criteria.mjs` 对着 `release-publish.yml` 核。
    *
-   * 为什么单列一条：Release Drafter 以「最新的正式版」作分界线，它自己不认哪个草稿被消费过。
-   * 不删的后果不是「草稿空白」，而是**草稿停在旧分界** —— 下一版读到的是上一批的正文，
-   * 而草稿看上去「有内容」。属静默错。
-   *
-   * 只删草稿、且必须显式关掉连带删 tag：`gh release delete <tag>` 默认连 tag 一起删，
-   * 而 tag 是守卫 `git describe --match 'v[0-9]*'` 读的东西，删掉它等于**下一次发版的基线没了**。
+   * 这里只判薄壳自己必须保住的东西：那次调用，以及 npm 认的两个字面量。
    */
-  it('发完删草稿，且不连带删掉 tag', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    expect(workflow, '没有删除草稿的步骤').toContain('gh release delete')
-    expect(workflow, '删草稿时没有关掉 --cleanup-tag，会连带删掉守卫依赖的 tag').toContain(
-      '--cleanup-tag=false',
-    )
-    // 删除必须按「isDraft 且 tag 不以 v 开头」圈定，不是按标题、也不能碰正式版。
-    expect(workflow, '删草稿时没有限定 isDraft / 非 v 前缀').toMatch(/select\(\.isDraft\)/)
-    expect(workflow, '删草稿时没有排除 v 前缀的 tag').toMatch(/select\(startswith\("v"\) \| not\)/)
-    // dry-run 不建正式版，此时删草稿会让那批正文永久丢失。
-    expect(workflow, '删草稿的条件没有带上 !inputs.dry-run').toMatch(
-      /if:.*!inputs\.dry-run.*steps\.notes\.outputs\.source == 'draft'/,
+  const source = () => readFileSync('.github/workflows/release.yml', 'utf8')
+
+  it('调用组织仓的共享发布链，而不是自带一份副本', () => {
+    expect(source(), '没有调用共享发布链').toContain(
+      'uses: dsh-plugin-lab/.github/.github/workflows/release-publish.yml@',
     )
   })
 
-  /**
-   * 手动与 tag 两个入口，以及 tag 触发带的两道闸。
-   *
-   * 这两条漏掉时都**不报错**，只是下一次 tag 发布会以一个离真相很远的理由变红：
-   * - 基线没排除正在发的那个 tag → `describe` 解析出它自己、`<tag>..HEAD` 恒空 →
-   *   一次完全正常的发布被判成「没有可发布的内容」。
-   * - 「只接受 main」没带事件守卫 → tag 触发时 `github.ref` 是 `refs/tags/...`，每次都红。
-   */
-  it('手动与 tag 两个入口都在，tag 触发的两道闸也在', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    expect(workflow, '没有手动触发入口').toMatch(/workflow_dispatch:/)
+  it('保住 npm 认的那三个字面量：文件名、id-token、environment 名', () => {
+    // 三者任一不符，registry 都只回一个 404，且不说原因 —— 实测三次：TP 不存在、文件名差、
+    // 环境名差，报的是同一句话。所以它们必须被钉住，不能靠改的时候记得。
+    const workflow = source()
+    expect(workflow, '没有为被调用的 job 转发 id-token').toMatch(/id-token:\s*write/)
+    expect(workflow, 'environment 名必须与 npm 上的 Trusted Publisher 逐字一致').toMatch(
+      /environment:\s*release\b/,
+    )
+    expect(workflow, '两个入口必须留在本仓，否则这个 workflow 永远不会被触发').toMatch(
+      /workflow_dispatch:/,
+    )
     expect(workflow, '没有 tag 触发入口').toMatch(/tags:\s*\n\s*-\s*'v\[0-9\]\*'/)
-
-    // ① 基线排除正在发的 tag。
-    expect(workflow, '守卫基线没有排除正在发的 tag').toMatch(
-      /--exclude=\$\{\{\s*github\.ref_name\s*\}\}/,
-    )
-    // ② 「只接受 main」带事件守卫。
-    expect(workflow, '「只接受 main」的判定没有事件守卫').toMatch(
-      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
-    )
-    // ③ tag 名与清单一致那道闸。
-    expect(workflow, '没有 tag/清单版本一致性那道闸').toMatch(
-      /Verify the pushed tag matches the manifest version/,
-    )
   })
 
-  it('上面那两条有牙齿（拿缺了这两样的写法比对，必须不满足）', () => {
-    const noExclude = "          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*')\n"
-    expect(noExclude).not.toMatch(/--exclude=\$\{\{\s*github\.ref_name\s*\}\}/)
-
-    const noEventGuard = "        if: github.ref != 'refs/heads/main'\n"
-    expect(noEventGuard).not.toMatch(
-      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
-    )
-    // 真文件里的那行必须满足 —— 判据不是「永远为真」。
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    expect(workflow).toMatch(
-      /github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*!=\s*'refs\/heads\/main'/,
-    )
-  })
-
-  /**
-   * 清洗草稿正文的那句 sed —— 本仓曾经**静默失效**过。
-   *
-   * 原来抄的是提示语的**中文全文**，而组织仓模板里那一句早已改成英文。于是两个模式一个都匹配
-   * 不上，「…not published…」原样进了正式 Release；而判据取的是子串「Release Drafter」，
-   * 那个子串还在，所以**测试照样绿**。
-   *
-   * 所以这里判的不是「删了没有」，而是**按什么删**：按 action 名匹配那一整行，中英文都吃。
-   */
-  it('清洗草稿按 action 名整行匹配，而不是抄提示语的全文', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8')
-    // 只看**会执行的行**：注释里提到 sed 与 Release Drafter 的话不算数 ——
-    // 否则这段解释它为什么这么写的注释本身就会把断言判红。
-    const sedLines = workflow
+  it('薄壳自己也不得改写版本号', () => {
+    const writes = source()
       .split('\n')
-      .filter((line) => !line.trim().startsWith('#'))
-      .filter((line) => /\bsed\b/.test(line) && line.includes('Release Drafter'))
-    expect(sedLines.length, '找不到清洗草稿正文那行 sed').toBeGreaterThan(0)
-    for (const line of sedLines) {
-      expect(
-        line,
-        '清洗草稿不能抄提示语的全文（那句话会被改写）—— 按 action 名 `/Release Drafter/d` 删整行',
-      ).toMatch(/sed '\/Release Drafter\/d'/)
-    }
-    // 反向控制：抄中文全文的那种写法必须不满足。
-    const chineseFull = "sed '/由 Release Drafter 自动汇总草稿/d; /gh workflow run release.yml/d'"
-    expect(chineseFull).not.toMatch(/sed '\/Release Drafter\/d'/)
+      .filter((line) => !/^\s*#/.test(line))
+      .filter((line) => /(npm|pnpm)\s+version\b|npm\s+pkg\s+set\b/.test(line))
+    expect(writes, '发布流程里出现了会改版本的命令').toEqual([])
+  })
+
+  it('上面三条有牙齿（自带整份副本、写死环境名之外的写法必须不满足）', () => {
+    const localCopy = 'name: Release\non:\n  push:\n    tags:\n      - "v[0-9]*"\n'
+    expect(localCopy).not.toContain('release-publish.yml@')
+    expect('      environment: github-release\n').not.toMatch(/environment:\s*release\b/)
+    expect('      - run: npm version patch\n').toMatch(/(npm|pnpm)\s+version\b/)
   })
 })
 
