@@ -9,7 +9,11 @@
     "dsh-plugin",
     "deepseek",
     "balance",
-    "usage"
+    "usage",
+    "sidebar",
+    "account",
+    "quota",
+    "credits"
   ],
   "license": "MIT",
   "author": "zlZayn",
