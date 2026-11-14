@@ -122,13 +122,15 @@ export interface PercentRingProps {
   ratio?: number
   /** 渲染边长（px），默认 18。 */
   size?: number
-  /** 可选的原生悬停提示，由 SVG 的 <title> 子元素承载。 */
-  title?: string
 }
 
 /**
  * 渲染状态圆环。
- * @param props - 状态、边长与可选提示。
+ *
+ * **不带悬停提示**：提示挂在外面那条触发按钮上（`SidebarBalance` 的官方 `Tooltip`），
+ * 锚是整条按钮的命中区而不是这个 24px 图形 —— 环若自己挂 SVG 原生 `<title>`，
+ * 按钮边缘那圈有悬浮灰底却没有提示，同一块悬浮区内圈外圈不一致。
+ * @param props - 状态、记号、弧长比例与边长。
  * @returns 圆环 svg；自身 aria-hidden，语义名由调用方的 aria-label 提供。
  */
 export function PercentRing({
@@ -136,7 +138,6 @@ export function PercentRing({
   marker = null,
   ratio = 1,
   size = 18,
-  title,
 }: PercentRingProps): JSX.Element {
   const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 1
   return (
@@ -149,8 +150,6 @@ export function PercentRing({
       aria-hidden="true"
       focusable="false"
     >
-      {/* <title> 是 SVG 的原生悬停提示；aria-hidden 只影响无障碍树，不影响它。 */}
-      {title === undefined ? null : <title>{title}</title>}
       {/* 轨道永远画、且**永不参与动画**：它是「这一格有个环」的底，
           转起来的是上面那条弧（见下）。 */}
       <circle className={css.track} cx={CENTER} cy={CENTER} r={RADIUS} />

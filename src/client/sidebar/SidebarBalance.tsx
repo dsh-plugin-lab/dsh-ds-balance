@@ -575,24 +575,25 @@ export function SidebarBalance({
   // 所以自动轮询带回来的新快照同样会把「多久之前」拨回「刚刚」。
   const ageMs = currentAgeMs(view.seenAt, view.seenAgeMs, now)
 
-  // 悬停文案：**两态共用 `hoverTextOf` 算出来的这一份**。
-  // 规则：**数字可信才显数字；这个处境有话说时，先说话** ——
-  // 所以「收起态与展开态显示同样的东西」是**结构保证**：下面两个分支只是把它
-  // 交给不同的渲染通道，不再各算各的。
+  // 悬停文案：**两态共用 `hoverTextOf` 算出来的这一份**，交付通道也只有一条。
+  // 规则：**数字可信才显数字；这个处境有话说时，先说话**。
   //
   // 从前这里是两条路：`ringTitle`（只在有状态文案时才设）与 `hoverLabel`
   // （有数字就给数字）。后果有两个：收起态在 `ok` / `low` / `critical` 上
   // **什么都不显示**（`stateText` 是 `null` → `undefined` → 那个 `<svg>` 里连
   // `<title>` 都没有），而 `stale` 上两态**各说各的**（收起态说「数据已过期」、
-  // 展开态报旧金额）。
+  // 展开态报旧金额）。上一轮先把**文案**收敛到 `hoverTextOf`（见
+  // [决策记录](../../../.agents/notes/2026-10-01-hover-tells-the-situation.md)）。
   //
-  // **交付通道仍是两条，这是有意的**：
-  // - rail（56px 轨道）**没有可见文字**，只能靠 SVG 原生 `<title>` 自带一条提示；
-  // - 展开态已经有可见标签，提示是锦上添花，交给官方 `Tooltip` 原语，
-  //   底色才能跟着主题走（自绘黑底会跟主题脱节）。
-  // 也就是说：**「说什么」只有一处，「怎么显示」才分两条。**
+  // **交付通道也收敛成一条（官方 `Tooltip` 原语，两态都挂）**，因为「说什么」
+  // 一致还不够 —— **命中区**也得一致。收起态从前挂的是 24px 的 SVG 原生 `<title>`，
+  // 而原生 title 的命中面**就是那个 `<svg>`**：36×36 按钮边缘那圈有悬浮灰底、
+  // 却什么都不弹，于是同一块悬浮区「内圈有、外圈没有」。原语的锚是**整条按钮**，
+  // 悬浮灰底覆盖到哪里就弹到哪里 —— 展开态 44px 整行一直如此，收起态现在同构。
+  // 取这条通道还有两个附带的理由：底色跟着主题走（自绘黑底会跟主题脱节），
+  // 且两态只差一个 `side`，不再存在第二套「怎么显示」的实现。
   // 另外**来源（API Key / 账号登录）不进悬停**：它属于浮层标题那一行 ——
-  // 原生 title 的长度与换行都不受控，两句拼一起会长得离谱。
+  // 两句拼一起会长得离谱，气泡还有半视口宽的上限。
   const hoverText = hoverTextOf(shown, stateText)
 
   // 刻意不写 aria-haspopup="dialog"：
@@ -636,32 +637,33 @@ export function SidebarBalance({
           marker={ring.marker}
           ratio={ringRatio}
           // 与展开态同一个环径：官方折叠态的头像也是 24px，两态只差命中区（36×36）。
+          // **不再传 title**：悬停由外面那条 `Tooltip` 承担，锚是整条按钮 ——
+          // 环只是它内部的一个 24px 图形，命中面不该由图形自己划。
           size={24}
-          // 收起态的交付通道：SVG 原生 `<title>`。内容与展开态那条 Tooltip **同源**
-          // （都来自上面的 `hoverText`），`null` 时连 `<title>` 都不渲染。
-          title={hoverText ?? undefined}
         />
       )}
     </button>
   )
 
+  // 悬停交付：**两态同一个原语，锚是整条按钮**。
+  // 两态只差 `side`（都对——条目贴着视口左缘，气泡往右让开）；`disabled={open}`
+  // 两态都要：浮层已经打开时面板里就有这份数据，再飘一个气泡是重复，
+  // 而且点开浮层后指针通常还停在条目上，两个面会同时挂在视口里。
+  // 展开态里标记（感叹号）自己那层 Tooltip 嵌在这条里面：原语用 TooltipSuppression
+  // 上下文，内层可见时会通知祖先把自己压掉，所以指针停在感叹号上只有一个气泡。
+  // `hoverText` 为 null 时不包这一层 —— 不留空气泡。
+  const hoverableTrigger =
+    hoverText === null ? (
+      trigger
+    ) : (
+      <Tooltip label={hoverText} side="right" delayMs={500} disabled={open}>
+        {trigger}
+      </Tooltip>
+    )
+
   return (
     <div ref={rootRef} className={css.root} data-mode={wide ? 'wide' : 'rail'} tabIndex={-1}>
-      {/* 展开态：整条按钮包一层官方 Tooltip 原语来承担「悬浮看余额」——
-          底色就是官方 tooltip token，所以不许自己画黑底（自绘会跟主题脱节）。
-          标记自己那层 Tooltip 嵌在里面：原语用 TooltipSuppression 上下文，
-          内层可见时会通知祖先把自己压掉，所以指针停在感叹号上只有一个气泡。
-          浮层已经打开时整条压掉：面板里就有这份数据，再飘一个气泡是重复，
-          而且点开浮层后指针通常还停在条目上，两个面会同时挂在视口里。
-          **文案与收起态那条原生 title 同源**（`hoverText`），这里只换交付通道；
-          rail 不挂这层：那里已经有原生 title，再叠一层就成了两层提示。 */}
-      {wide && hoverText !== null ? (
-        <Tooltip label={hoverText} side="right" delayMs={500} disabled={open}>
-          {trigger}
-        </Tooltip>
-      ) : (
-        trigger
-      )}
+      {hoverableTrigger}
 
       {/* 关闭时整个浮层卸载：DOM 里不留任何可命中区域。
           浮层向上展开、正压在左邻条目上，所以只有点击才会打开它 —— 悬停打开会让

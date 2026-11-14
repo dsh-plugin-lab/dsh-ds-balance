@@ -3,21 +3,27 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, type ReactNode } from 'react'
 
 /**
- * 悬停：**收起态与展开态必须显示同样的东西**。
+ * 悬停：**收起态与展开态必须显示同样的东西，而且从同一块命中区弹出来**。
  *
  * 这条测试渲**真组件**（`SidebarBalance`），两态各渲一遍，再从 DOM 里各自读出
  * 「用户实际会看到什么」，逐条比对。它不是读某个函数的返回值 ——
- * 上一轮的缺陷恰恰在于**两态各算各的**：收起态用 `ringTitle`（只在有状态文案时才设），
+ * 上一轮（2026-10-01）的缺陷是**两态各算各的**：收起态用 `ringTitle`（只在有状态文案时才设），
  * 展开态用 `hoverLabel`（有数字就给数字）。后果有两个：
  * - `ok` / `low` / `critical` 收起态**什么都不显示**（连 `<title>` 都没有）；
  * - `stale` 上两态**各说各的**（收起态说「数据已过期」、展开态报旧金额）。
  *
- * 现在两态都取 `hoverTextOf(shown, stateText)` 那一个返回值，这条测试钉住它。
+ * 本轮（2026-11-14）修的是另一半：**文案一致还不够，命中区也得一致**。收起态原先挂的是
+ * 24px 的 SVG 原生 `<title>`，而原生 title 的命中面**就是那个 `<svg>`** ——
+ * 36×36 按钮边缘那圈有悬浮灰底、却什么都不弹。现在两态都挂官方 `Tooltip` 原语，
+ * 锚是**整条按钮**，所以下面有两条结构性断言：
+ * - 气泡的**直接子元素是 `<button>`**（不是里面的 `<svg>`）；
+ * - 两态**都不出现原生 `<title>`**（反向控制：谁把旧通道加回来，同一块悬浮区就会两层提示）。
  *
  * **为什么要 mock `ui-primitives`**：那包的 `lib` 里带 `.module.css`，而 node_modules
  * 默认被外部化交给 Node 直接 import，Node 不认 `.css`（`ERR_UNKNOWN_FILE_EXTENSION`），
  * 于是任何 import 到它的组件都渲不出来。这里把它换成同形状的替身：
- * `Tooltip` 把 label 写进 `data-tooltip` 并带上 `side`，测试据此读出「展开态会说什么」。
+ * `Tooltip` 把 label 写进 `data-tooltip` 并带上 `side`，并把 `children` 原样渲染 ——
+ * 测试据此既能读出「会说什么」，也能读出「锚是谁」。
  */
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconWarningOutlineRegular: (): null => null,
@@ -64,15 +70,9 @@ function render(scenarioKey: string, wide: boolean): string {
   return html
 }
 
-/** 收起态的悬停面：SVG 里那个原生 `<title>`。 */
-function railHover(scenarioKey: string): string | null {
-  const match = /<title>([^<]*)<\/title>/.exec(render(scenarioKey, false))
-  return match === null ? null : match[1]
-}
-
-/** 展开态的悬停面：外层 Tooltip（`side="right"`）的 label；标记那层是 `bottom`，别拿错。 */
-function wideHover(scenarioKey: string): string | null {
-  const outer = /<span data-tooltip="([^"]*)" data-side="right"/.exec(render(scenarioKey, true))
+/** 悬停面：外层 `Tooltip` 的 label。标记（感叹号）那层是 `data-side="bottom"`，别拿错。 */
+function hoverOf(scenarioKey: string, wide: boolean): string | null {
+  const outer = /<span data-tooltip="([^"]*)" data-side="right"/.exec(render(scenarioKey, wide))
   return outer === null ? null : outer[1]
 }
 
@@ -109,8 +109,8 @@ describe('悬停：收起态与展开态一致', () => {
   it('**两态逐条相同**，且都非空（收起态不再「什么都不显示」）', () => {
     const rows: string[] = []
     for (const [situation, key] of CASES) {
-      const rail = railHover(key)
-      const wide = wideHover(key)
+      const rail = hoverOf(key, false)
+      const wide = hoverOf(key, true)
       rows.push(`${situation.padEnd(20)} 收起=${String(rail).padEnd(10)} 展开=${String(wide)}`)
       expect(rail, `${situation}：收起态与展开态不一样`).toBe(wide)
       // 关键回归：收起态**必须**有东西可显（从前 ok/low/critical 是 null）。
@@ -122,27 +122,52 @@ describe('悬停：收起态与展开态一致', () => {
 
   it('**文案与规则表逐条一致**（两态都查）', () => {
     for (const [situation, key, expected] of CASES) {
-      expect(railHover(key), `${situation}（收起态）`).toBe(expected)
-      expect(wideHover(key), `${situation}（展开态）`).toBe(expected)
+      expect(hoverOf(key, false), `${situation}（收起态）`).toBe(expected)
+      expect(hoverOf(key, true), `${situation}（展开态）`).toBe(expected)
     }
   })
 
   it('**`stale` 与 `account-unavailable` 明明有数字，也**不**显数字**', () => {
-    // 这两条是本轮改动的核心：它们有 `shown`，但数字不可信 / 不可用。
+    // 这两条是上一轮改动的核心：它们有 `shown`，但数字不可信 / 不可用。
     // 若哪天有人把规则退回「有数字就显金额」，这条会红。
     for (const [situation, key] of CASES) {
       if (situation !== 'stale' && situation !== 'account-unavailable') continue
       const balance = scenarios[key as keyof typeof scenarios].selected
       expect(balance, `${situation} 的 mock 场景应当带着数字，否则测不到这条`).not.toBeNull()
       const money = formatMoney(balance!.total, balance!.currency)
-      expect(railHover(key), situation).not.toBe(money)
-      expect(wideHover(key), situation).not.toBe(money)
+      expect(hoverOf(key, false), situation).not.toBe(money)
+      expect(hoverOf(key, true), situation).not.toBe(money)
     }
   })
 
-  it('**收起态不再带「DeepSeek 余额状态 」前缀**（前缀会让两态文字不同）', () => {
+  it('**两态都不带「DeepSeek 余额状态 」前缀**（前缀会让两态文字不同）', () => {
     for (const [, key] of CASES) {
-      expect(railHover(key) ?? '', key).not.toContain(zh['sidebar.aria.ring'])
+      expect(hoverOf(key, false) ?? '', key).not.toContain(zh['sidebar.aria.ring'])
+      expect(hoverOf(key, true) ?? '', key).not.toContain(zh['sidebar.aria.ring'])
+    }
+  })
+
+  it('**锚是整条按钮，不是里面那个 24px 圆环**（悬浮灰底到哪，气泡就到哪）', () => {
+    // 这条钉住本轮的修法：原生 `<title>` 挂在 `<svg>` 上时，命中面只有 24px，
+    // 36×36 按钮边缘那圈（有悬浮灰底）什么都不弹。原语的克隆锚必须是 `<button>`。
+    for (const [situation, key] of CASES) {
+      for (const wide of [false, true]) {
+        const html = render(key, wide)
+        expect(
+          /<span data-tooltip="[^"]*" data-side="right"><button/.test(html),
+          `${situation}（${wide ? '展开' : '收起'}态）：气泡的锚不是那条触发按钮`,
+        ).toBe(true)
+      }
+    }
+  })
+
+  it('**只剩一条交付通道**：两态都不出现 SVG 原生 `<title>`', () => {
+    // 反向控制：把 `<title>` 加回来，收起态就会同时有原生提示与原语气泡 ——
+    // 同一个悬浮区两次提示，且原生那条的命中面只有圆环本身。
+    for (const [, key] of CASES) {
+      for (const wide of [false, true]) {
+        expect(render(key, wide), `${key}（${wide ? '展开' : '收起'}态）`).not.toContain('<title>')
+      }
     }
   })
 })
