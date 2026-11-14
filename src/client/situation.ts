@@ -290,8 +290,10 @@ export function familyOf(situation: Situation): SituationFamily {
  * 3. 收起态还多一个「DeepSeek 余额状态 」前缀，同一个处境两态文字不同。
  *
  * 收敛到一个返回值之后，两态**不可能**再分叉 —— 这是结构保证，不是靠两处对齐。
- * 交付通道仍分两条（收起态走 SVG 原生 `<title>`、展开态走官方 `Tooltip` 原语），
- * 但那是「怎么显示」的差别，与「说什么」无关。
+ * 交付通道也只有一条（两态都挂官方 `Tooltip` 原语、锚是整条触发按钮）：
+ * 文案一致还不够，**命中区**也得一致 —— 收起态从前挂 24px 的 SVG 原生 `<title>`，
+ * 而原生 title 的命中面就是那个 `<svg>`，于是按钮边缘那圈有悬浮灰底却不弹。
+ * 见 [决策记录](../../../.agents/notes/2026-11-14-hover-hit-area-is-the-button.md)。
  * @param shown - 实际展示的那条余额；`null` 表示没有数字。
  * @param stateText - 处境的文案；`null` 表示这个处境没什么要说的（数字可信）。
  * @returns 悬停要显示的那一句；`null` 表示两态都不挂悬停。
